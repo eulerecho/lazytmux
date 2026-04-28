@@ -1,0 +1,24 @@
+[project]
+name = "lazytmux-dev"
+version = "0.0.0"
+description = "Developer tooling for the lazytmux C++ port"
+requires-python = ">=3.10"
+dependencies = [
+    "conan>=2.7,<3.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "clang-format>=19",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
