@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Sync dev tooling
+        run: uv sync --group dev
+
+      - name: Conan install (Debug, ASan + UBSan)
+        run: |
+          uv run conan profile detect --force
+          uv run conan install . \
+            -s build_type=Debug -s compiler.cppstd=23 \
+            -o '&:enable_asan=True' -o '&:enable_ubsan=True' \
+            --build=missing
+
+      - name: Configure
+        run: cmake --preset conan-enable_tsan_false-debug
+
+      - name: Format check
+        run: ./scripts/format.sh --check
+
+      - name: Build
+        run: cmake --build --preset conan-enable_tsan_false-debug
+
+      - name: Test
+        run: ctest --preset conan-enable_tsan_false-debug --output-on-failure
+
+  # TODO: add a tsan job once threading lands.
+  # TODO: add macos-14 + clang lanes once cross-platform source
+  # surface exists to exercise.
+  # TODO: wire clang-tidy as a CI step against compile_commands.json
+  # once there is real source to lint.
