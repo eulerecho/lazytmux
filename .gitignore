@@ -1,0 +1,22 @@
+# Build
+build/
+cmake-build-*/
+
+# uv / Python
+.venv/
+__pycache__/
+*.pyc
+
+# Compile commands symlink at repo root (real DB lives in build/)
+compile_commands.json
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Conan-managed (rewritten on every `conan install`).
+CMakeUserPresets.json
+CMakeUserPresets.json.bak
