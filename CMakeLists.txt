@@ -34,6 +34,7 @@ add_library(lazytmux::core ALIAS lazytmux_core)
 
 target_sources(lazytmux_core
     PRIVATE
+        src/colors.cpp
         src/error.cpp
         src/snapshots/timestamp.cpp
         src/tmux/ids.cpp
@@ -63,6 +64,7 @@ if(LAZYTMUX_BUILD_TESTS)
     include(GoogleTest)
 
     add_executable(test_scaffold
+        tests/test_colors.cpp
         tests/test_error.cpp
         tests/test_ids.cpp
         tests/test_parse.cpp
