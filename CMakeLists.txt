@@ -64,6 +64,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_error.cpp
         tests/test_ids.cpp
         tests/test_smoke.cpp
+        tests/test_types.cpp
     )
     target_link_libraries(test_scaffold
         PRIVATE
