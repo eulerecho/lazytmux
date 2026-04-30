@@ -35,6 +35,7 @@ add_library(lazytmux::core ALIAS lazytmux_core)
 target_sources(lazytmux_core
     PRIVATE
         src/error.cpp
+        src/tmux/ids.cpp
         src/version.cpp
 )
 
@@ -61,6 +62,7 @@ if(LAZYTMUX_BUILD_TESTS)
 
     add_executable(test_scaffold
         tests/test_error.cpp
+        tests/test_ids.cpp
         tests/test_smoke.cpp
     )
     target_link_libraries(test_scaffold
