@@ -34,6 +34,8 @@ add_library(lazytmux::core ALIAS lazytmux_core)
 
 target_sources(lazytmux_core
     PRIVATE
+        src/cmdmode/commands.cpp
+        src/cmdmode/parse.cpp
         src/colors.cpp
         src/error.cpp
         src/filter.cpp
@@ -68,6 +70,7 @@ if(LAZYTMUX_BUILD_TESTS)
     include(GoogleTest)
 
     add_executable(test_scaffold
+        tests/test_cmdmode.cpp
         tests/test_colors.cpp
         tests/test_error.cpp
         tests/test_filter.cpp
