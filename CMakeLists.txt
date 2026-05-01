@@ -36,6 +36,7 @@ target_sources(lazytmux_core
     PRIVATE
         src/colors.cpp
         src/error.cpp
+        src/nesting.cpp
         src/snapshots/timestamp.cpp
         src/tmux/ids.cpp
         src/tmux/parse.cpp
@@ -68,6 +69,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_colors.cpp
         tests/test_error.cpp
         tests/test_ids.cpp
+        tests/test_nesting.cpp
         tests/test_parse.cpp
         tests/test_smoke.cpp
         tests/test_socket.cpp
