@@ -40,6 +40,7 @@ target_sources(lazytmux_core
         src/error.cpp
         src/filter.cpp
         src/frecency.cpp
+        src/io/process.cpp
         src/nesting.cpp
         src/snapshots/timestamp.cpp
         src/tmux/ids.cpp
@@ -78,6 +79,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_ids.cpp
         tests/test_nesting.cpp
         tests/test_parse.cpp
+        tests/test_process.cpp
         tests/test_smoke.cpp
         tests/test_socket.cpp
         tests/test_timestamp.cpp
