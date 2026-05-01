@@ -43,8 +43,10 @@ target_sources(lazytmux_core
         src/io/process.cpp
         src/nesting.cpp
         src/snapshots/timestamp.cpp
+        src/tmux/discovery.cpp
         src/tmux/ids.cpp
         src/tmux/parse.cpp
+        src/tmux/run.cpp
         src/tmux/socket.cpp
         src/version.cpp
 )
@@ -81,7 +83,9 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_parse.cpp
         tests/test_process.cpp
         tests/test_smoke.cpp
+        tests/test_socket_discovery.cpp
         tests/test_socket.cpp
+        tests/test_tmux_run.cpp
         tests/test_timestamp.cpp
         tests/test_types.cpp
     )
