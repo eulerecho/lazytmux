@@ -37,21 +37,36 @@ target_sources(lazytmux_core
         src/cmdmode/commands.cpp
         src/cmdmode/parse.cpp
         src/colors.cpp
+        src/config.cpp
         src/error.cpp
         src/filter.cpp
         src/frecency.cpp
+        src/frecency_store.cpp
+        src/io/process.cpp
         src/nesting.cpp
+        src/proc.cpp
+        src/snapshots/list.cpp
+        src/snapshots/restore.cpp
         src/snapshots/timestamp.cpp
+        src/tmux/discovery.cpp
         src/tmux/ids.cpp
         src/tmux/parse.cpp
+        src/tmux/run.cpp
         src/tmux/socket.cpp
         src/version.cpp
+        src/zoxide.cpp
 )
 
 target_include_directories(lazytmux_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(lazytmux_core
+    PRIVATE
+        nlohmann_json::nlohmann_json
+        tomlplusplus::tomlplusplus
 )
 
 target_compile_features(lazytmux_core PUBLIC cxx_std_23)
@@ -72,16 +87,25 @@ if(LAZYTMUX_BUILD_TESTS)
     add_executable(test_scaffold
         tests/test_cmdmode.cpp
         tests/test_colors.cpp
+        tests/test_config.cpp
         tests/test_error.cpp
         tests/test_filter.cpp
         tests/test_frecency.cpp
+        tests/test_frecency_store.cpp
         tests/test_ids.cpp
         tests/test_nesting.cpp
         tests/test_parse.cpp
+        tests/test_proc.cpp
+        tests/test_process.cpp
+        tests/test_snapshot_list.cpp
+        tests/test_snapshot_restore.cpp
         tests/test_smoke.cpp
+        tests/test_socket_discovery.cpp
         tests/test_socket.cpp
+        tests/test_tmux_run.cpp
         tests/test_timestamp.cpp
         tests/test_types.cpp
+        tests/test_zoxide.cpp
     )
     target_link_libraries(test_scaffold
         PRIVATE
