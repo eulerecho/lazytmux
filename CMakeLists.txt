@@ -124,6 +124,24 @@ if(LAZYTMUX_BUILD_TESTS)
     gtest_discover_tests(test_scaffold
         DISCOVERY_MODE PRE_TEST
     )
+
+    add_executable(test_live_tmux
+        tests/test_live_tmux.cpp
+    )
+    target_link_libraries(test_live_tmux
+        PRIVATE
+            lazytmux::core
+            GTest::gtest
+            GTest::gtest_main
+    )
+    target_compile_features(test_live_tmux PRIVATE cxx_std_23)
+    lazytmux_apply_warnings(test_live_tmux)
+    lazytmux_apply_sanitizers(test_live_tmux)
+
+    gtest_discover_tests(test_live_tmux
+        DISCOVERY_MODE PRE_TEST
+        PROPERTIES LABELS live
+    )
 endif()
 
 if(LAZYTMUX_BUILD_EXAMPLES)
