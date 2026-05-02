@@ -51,6 +51,7 @@ target_sources(lazytmux_core
         src/tmux/run.cpp
         src/tmux/socket.cpp
         src/version.cpp
+        src/zoxide.cpp
 )
 
 target_include_directories(lazytmux_core
@@ -97,6 +98,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_tmux_run.cpp
         tests/test_timestamp.cpp
         tests/test_types.cpp
+        tests/test_zoxide.cpp
     )
     target_link_libraries(test_scaffold
         PRIVATE
