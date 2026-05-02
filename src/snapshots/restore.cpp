@@ -37,6 +37,90 @@ std::vector<std::filesystem::path> candidates_for(const RestoreConfig& config) {
     return default_script_candidates();
 }
 
+Result<std::optional<std::filesystem::path>> read_last_target(const std::filesystem::path& last) {
+    std::error_code status_ec;
+    const auto status = std::filesystem::symlink_status(last, status_ec);
+    if (status.type() == std::filesystem::file_type::not_found) {
+        return std::nullopt;
+    }
+    if (status_ec) {
+        return std::unexpected(Error{
+            ErrorKind::kIo,
+            std::format("failed to inspect {}: {}", last.string(), status_ec.message()),
+        });
+    }
+    if (!std::filesystem::is_symlink(status)) {
+        return std::unexpected(Error{
+            ErrorKind::kInvalidInput,
+            std::format("{} exists but is not a symlink", last.string()),
+        });
+    }
+
+    std::error_code read_ec;
+    auto target = std::filesystem::read_symlink(last, read_ec);
+    if (read_ec) {
+        return std::unexpected(Error{
+            ErrorKind::kIo,
+            std::format("failed to read {}: {}", last.string(), read_ec.message()),
+        });
+    }
+    return target;
+}
+
+Result<void> remove_path(const std::filesystem::path& path) {
+    std::error_code remove_ec;
+    std::filesystem::remove(path, remove_ec);
+    if (remove_ec) {
+        return std::unexpected(Error{
+            ErrorKind::kIo,
+            std::format("failed to remove {}: {}", path.string(), remove_ec.message()),
+        });
+    }
+    return {};
+}
+
+Result<void> link_last(const std::filesystem::path& last, const std::filesystem::path& target) {
+    std::error_code link_ec;
+    std::filesystem::create_symlink(target, last, link_ec);
+    if (link_ec) {
+        return std::unexpected(Error{
+            ErrorKind::kIo,
+            std::format(
+                "failed to link {} to {}: {}", last.string(), target.string(), link_ec.message()),
+        });
+    }
+    return {};
+}
+
+Result<void> replace_last(const std::filesystem::path& last, const std::filesystem::path& target) {
+    if (auto removed = remove_path(last); !removed) {
+        return removed;
+    }
+    return link_last(last, target);
+}
+
+Result<void> restore_last(const std::filesystem::path& last,
+                          const std::optional<std::filesystem::path>& previous) {
+    if (auto removed = remove_path(last); !removed) {
+        return removed;
+    }
+    if (!previous) {
+        return {};
+    }
+    return link_last(last, *previous);
+}
+
+Result<void> fail_with_rollback(Error err,
+                                const std::filesystem::path& last,
+                                const std::optional<std::filesystem::path>& previous) {
+    auto rolled_back = restore_last(last, previous);
+    if (!rolled_back) {
+        err.with_context(
+            std::format("rollback failed: {}", std::move(rolled_back).error().message()));
+    }
+    return std::unexpected(std::move(err));
+}
+
 }  // namespace
 
 Result<std::filesystem::path> locate_restore_script(const RestoreConfig& config) {
@@ -47,34 +131,45 @@ Result<std::filesystem::path> locate_restore_script(const RestoreConfig& config)
         }
         ec.clear();
     }
-    return std::unexpected(Error("tmux-resurrect restore script not found"));
+    return std::unexpected(Error{ErrorKind::kNotFound, "tmux-resurrect restore script not found"});
 }
 
 Result<void> restore_snapshot(const std::filesystem::path& snapshot_path,
                               const RestoreConfig& config) {
     const auto dir = snapshot_path.parent_path();
     if (dir.empty()) {
-        return std::unexpected(Error("snapshot path has no parent directory"));
+        return std::unexpected(
+            Error{ErrorKind::kInvalidInput, "snapshot path has no parent directory"});
     }
 
     std::error_code exists_ec;
     if (!std::filesystem::exists(snapshot_path, exists_ec)) {
         if (exists_ec) {
-            return std::unexpected(Error(std::format(
-                "failed to inspect {}: {}", snapshot_path.string(), exists_ec.message())));
+            return std::unexpected(Error{
+                ErrorKind::kIo,
+                std::format(
+                    "failed to inspect {}: {}", snapshot_path.string(), exists_ec.message()),
+            });
         }
-        return std::unexpected(
-            Error(std::format("snapshot file not found: {}", snapshot_path.string())));
+        return std::unexpected(Error{
+            ErrorKind::kNotFound,
+            std::format("snapshot file not found: {}", snapshot_path.string()),
+        });
     }
 
     std::error_code status_ec;
     if (!std::filesystem::is_regular_file(snapshot_path, status_ec)) {
         if (status_ec) {
-            return std::unexpected(Error(std::format(
-                "failed to inspect {}: {}", snapshot_path.string(), status_ec.message())));
+            return std::unexpected(Error{
+                ErrorKind::kIo,
+                std::format(
+                    "failed to inspect {}: {}", snapshot_path.string(), status_ec.message()),
+            });
         }
-        return std::unexpected(
-            Error(std::format("snapshot path is not a file: {}", snapshot_path.string())));
+        return std::unexpected(Error{
+            ErrorKind::kInvalidInput,
+            std::format("snapshot path is not a file: {}", snapshot_path.string()),
+        });
     }
 
     auto script = locate_restore_script(config);
@@ -83,32 +178,31 @@ Result<void> restore_snapshot(const std::filesystem::path& snapshot_path,
     }
 
     const auto last = dir / "last";
-    std::error_code remove_ec;
-    std::filesystem::remove(last, remove_ec);
-    if (remove_ec) {
-        return std::unexpected(
-            Error(std::format("failed to remove {}: {}", last.string(), remove_ec.message())));
+    auto previous = read_last_target(last);
+    if (!previous) {
+        return std::unexpected(std::move(previous).error());
     }
 
-    std::error_code link_ec;
-    std::filesystem::create_symlink(snapshot_path, last, link_ec);
-    if (link_ec) {
-        return std::unexpected(Error(std::format("failed to link {} to {}: {}",
-                                                 last.string(),
-                                                 snapshot_path.string(),
-                                                 link_ec.message())));
+    auto replaced = replace_last(last, snapshot_path);
+    if (!replaced) {
+        return fail_with_rollback(std::move(replaced).error(), last, *previous);
     }
 
     const std::vector<std::string> argv{config.shell, script->string()};
     auto result = io::run_command(argv);
     if (!result) {
-        return std::unexpected(std::move(result).error());
+        return fail_with_rollback(std::move(result).error(), last, *previous);
     }
     if (result->exit_code != 0) {
-        return std::unexpected(Error{
-            ErrorKind::kExternalCommandFailure,
-            std::format(
-                "restore script exited with code {}: {}", result->exit_code, result->stderr_text)});
+        return fail_with_rollback(
+            Error{
+                ErrorKind::kExternalCommandFailure,
+                std::format("restore script exited with code {}: {}",
+                            result->exit_code,
+                            result->stderr_text),
+            },
+            last,
+            *previous);
     }
     return {};
 }
