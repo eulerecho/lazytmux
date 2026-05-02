@@ -37,6 +37,7 @@ target_sources(lazytmux_core
         src/cmdmode/commands.cpp
         src/cmdmode/parse.cpp
         src/colors.cpp
+        src/config.cpp
         src/error.cpp
         src/filter.cpp
         src/frecency.cpp
@@ -63,6 +64,7 @@ target_include_directories(lazytmux_core
 target_link_libraries(lazytmux_core
     PRIVATE
         nlohmann_json::nlohmann_json
+        tomlplusplus::tomlplusplus
 )
 
 target_compile_features(lazytmux_core PUBLIC cxx_std_23)
@@ -83,6 +85,7 @@ if(LAZYTMUX_BUILD_TESTS)
     add_executable(test_scaffold
         tests/test_cmdmode.cpp
         tests/test_colors.cpp
+        tests/test_config.cpp
         tests/test_error.cpp
         tests/test_filter.cpp
         tests/test_frecency.cpp
