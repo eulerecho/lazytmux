@@ -86,8 +86,10 @@ Result<std::vector<Entry>> load_top(std::size_t limit, const std::string& execut
         return std::vector<Entry>{};
     }
     if (result->exit_code != 0) {
-        return std::unexpected(Error(std::format(
-            "zoxide query exited with code {}: {}", result->exit_code, result->stderr_text)));
+        return std::unexpected(Error{
+            ErrorKind::kExternalCommandFailure,
+            std::format(
+                "zoxide query exited with code {}: {}", result->exit_code, result->stderr_text)});
     }
 
     auto entries = parse_entries(result->stdout_text);

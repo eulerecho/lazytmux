@@ -1,5 +1,6 @@
 #include <lazytmux/io/process.hpp>
 
+#include <chrono>
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>
@@ -28,7 +29,37 @@ TEST(ProcessRunnerTest, RejectsEmptyArgv) {
     const std::vector<std::string> argv;
     auto result = run_command(argv);
     ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().kind(), ErrorKind::kInvalidInput);
     EXPECT_NE(result.error().message().find("argv"), std::string_view::npos);
+}
+
+TEST(ProcessRunnerTest, RejectsNonPositiveTimeout) {
+    const std::vector<std::string> argv{"/bin/sh", "-c", "true"};
+    auto result = run_command(argv, CommandOptions{.timeout = std::chrono::milliseconds{0}});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().kind(), ErrorKind::kInvalidInput);
+    EXPECT_NE(result.error().message().find("timeout"), std::string_view::npos);
+}
+
+TEST(ProcessRunnerTest, TimesOutAndTerminatesChild) {
+    const std::vector<std::string> argv{"/bin/sh", "-c", "sleep 1"};
+    const auto started = std::chrono::steady_clock::now();
+
+    auto result = run_command(argv, CommandOptions{.timeout = std::chrono::milliseconds{25}});
+
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().kind(), ErrorKind::kTimeout);
+    EXPECT_LT(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed),
+              std::chrono::milliseconds{500});
+}
+
+TEST(ProcessRunnerTest, OutputLimitTerminatesChild) {
+    const std::vector<std::string> argv{"/bin/sh", "-c", "printf abcdef"};
+    auto result = run_command(argv, CommandOptions{.max_output_bytes = 3});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().kind(), ErrorKind::kExternalCommandFailure);
+    EXPECT_NE(result.error().message().find("capture limit"), std::string_view::npos);
 }
 
 TEST(ProcessRunnerTest, StatusIsFalseForNonzeroExit) {
@@ -36,6 +67,14 @@ TEST(ProcessRunnerTest, StatusIsFalseForNonzeroExit) {
     auto result = run_command_status(argv);
     ASSERT_TRUE(result.has_value()) << result.error().display();
     EXPECT_FALSE(*result);
+}
+
+TEST(ProcessRunnerTest, StatusPropagatesTimeout) {
+    const std::vector<std::string> argv{"/bin/sh", "-c", "sleep 1"};
+    auto result =
+        run_command_status(argv, CommandOptions{.timeout = std::chrono::milliseconds{25}});
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error().kind(), ErrorKind::kTimeout);
 }
 
 }  // namespace
