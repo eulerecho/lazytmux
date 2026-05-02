@@ -73,6 +73,7 @@ TEST(FrecencyStoreTest, InvalidJsonReturnsError) {
 
     auto loaded = load_index(path);
     ASSERT_FALSE(loaded.has_value());
+    EXPECT_EQ(loaded.error().kind(), ErrorKind::kParse);
     EXPECT_NE(loaded.error().message().find("parse"), std::string_view::npos);
 }
 
@@ -85,6 +86,7 @@ TEST(FrecencyStoreTest, InvalidSessionNameReturnsError) {
 
     auto loaded = load_index(path);
     ASSERT_FALSE(loaded.has_value());
+    EXPECT_EQ(loaded.error().kind(), ErrorKind::kParse);
     EXPECT_NE(loaded.error().message().find("empty"), std::string_view::npos);
 }
 

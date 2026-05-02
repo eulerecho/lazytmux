@@ -21,34 +21,41 @@ constexpr std::string_view kLastUsed = "last_used";
 Result<std::string> read_all(const std::filesystem::path& path) {
     std::ifstream in(path);
     if (!in) {
-        return std::unexpected(Error(std::format("failed to open {}", path.string())));
+        return std::unexpected(
+            Error{ErrorKind::kIo, std::format("failed to open {}", path.string())});
     }
     std::string body((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     if (in.bad()) {
-        return std::unexpected(Error(std::format("failed to read {}", path.string())));
+        return std::unexpected(
+            Error{ErrorKind::kIo, std::format("failed to read {}", path.string())});
     }
     return body;
 }
 
 Result<std::map<tmux::SessionName, Entry>> parse_entries(const nlohmann::json& doc) {
     if (!doc.is_object() || !doc.contains(kSessions) || !doc.at(kSessions).is_array()) {
-        return std::unexpected(Error("frecency file must contain a sessions array"));
+        return std::unexpected(
+            Error{ErrorKind::kParse, "frecency file must contain a sessions array"});
     }
 
     std::map<tmux::SessionName, Entry> entries;
     for (const auto& row : doc.at(kSessions)) {
         if (!row.is_object() || !row.contains(kName) || !row.contains(kVisits) ||
             !row.contains(kLastUsed)) {
-            return std::unexpected(Error("frecency row is missing required fields"));
+            return std::unexpected(
+                Error{ErrorKind::kParse, "frecency row is missing required fields"});
         }
         if (!row.at(kName).is_string() || !row.at(kVisits).is_number_unsigned() ||
             !row.at(kLastUsed).is_number_integer()) {
-            return std::unexpected(Error("frecency row has the wrong field types"));
+            return std::unexpected(
+                Error{ErrorKind::kParse, "frecency row has the wrong field types"});
         }
 
         auto name = tmux::SessionName::make(row.at(kName).get<std::string>());
         if (!name) {
-            return std::unexpected(std::move(name).error().with_context("parse frecency name"));
+            auto err = Error{ErrorKind::kParse, std::string{std::move(name).error().message()}};
+            err.with_context("parse frecency name");
+            return std::unexpected(std::move(err));
         }
         auto visits = row.at(kVisits).get<std::uint32_t>();
         auto last_used = row.at(kLastUsed).get<std::int64_t>();
@@ -75,8 +82,10 @@ Result<Index> load_index(const std::filesystem::path& path) {
     std::error_code exists_ec;
     if (!std::filesystem::exists(path, exists_ec)) {
         if (exists_ec) {
-            return std::unexpected(
-                Error(std::format("failed to inspect {}: {}", path.string(), exists_ec.message())));
+            return std::unexpected(Error{
+                ErrorKind::kIo,
+                std::format("failed to inspect {}: {}", path.string(), exists_ec.message()),
+            });
         }
         return Index{};
     }
@@ -93,8 +102,10 @@ Result<Index> load_index(const std::filesystem::path& path) {
         }
         return Index{std::move(*entries)};
     } catch (const nlohmann::json::exception& e) {
-        return std::unexpected(
-            Error(std::format("failed to parse {}: {}", path.string(), e.what())));
+        return std::unexpected(Error{
+            ErrorKind::kParse,
+            std::format("failed to parse {}: {}", path.string(), e.what()),
+        });
     }
 }
 
@@ -104,8 +115,10 @@ Result<void> save_index(const Index& index, const std::filesystem::path& path) {
         std::error_code mkdir_ec;
         std::filesystem::create_directories(parent, mkdir_ec);
         if (mkdir_ec) {
-            return std::unexpected(
-                Error(std::format("failed to create {}: {}", parent.string(), mkdir_ec.message())));
+            return std::unexpected(Error{
+                ErrorKind::kIo,
+                std::format("failed to create {}: {}", parent.string(), mkdir_ec.message()),
+            });
         }
     }
 
@@ -114,11 +127,13 @@ Result<void> save_index(const Index& index, const std::filesystem::path& path) {
     {
         std::ofstream out(tmp, std::ios::trunc);
         if (!out) {
-            return std::unexpected(Error(std::format("failed to open {}", tmp.string())));
+            return std::unexpected(
+                Error{ErrorKind::kIo, std::format("failed to open {}", tmp.string())});
         }
         out << to_json(index).dump(2) << '\n';
         if (!out) {
-            return std::unexpected(Error(std::format("failed to write {}", tmp.string())));
+            return std::unexpected(
+                Error{ErrorKind::kIo, std::format("failed to write {}", tmp.string())});
         }
     }
 
@@ -127,8 +142,11 @@ Result<void> save_index(const Index& index, const std::filesystem::path& path) {
     if (rename_ec) {
         std::error_code remove_ec;
         std::filesystem::remove(tmp, remove_ec);
-        return std::unexpected(Error(std::format(
-            "failed to rename {} to {}: {}", tmp.string(), path.string(), rename_ec.message())));
+        return std::unexpected(Error{
+            ErrorKind::kIo,
+            std::format(
+                "failed to rename {} to {}: {}", tmp.string(), path.string(), rename_ec.message()),
+        });
     }
     return {};
 }

@@ -41,6 +41,7 @@ target_sources(lazytmux_core
         src/error.cpp
         src/filter.cpp
         src/frecency.cpp
+        src/frecency_rank.cpp
         src/frecency_store.cpp
         src/io/process.cpp
         src/nesting.cpp
@@ -91,6 +92,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_error.cpp
         tests/test_filter.cpp
         tests/test_frecency.cpp
+        tests/test_frecency_rank.cpp
         tests/test_frecency_store.cpp
         tests/test_ids.cpp
         tests/test_nesting.cpp
