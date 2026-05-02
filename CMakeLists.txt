@@ -40,6 +40,7 @@ target_sources(lazytmux_core
         src/error.cpp
         src/filter.cpp
         src/frecency.cpp
+        src/frecency_store.cpp
         src/io/process.cpp
         src/nesting.cpp
         src/proc.cpp
@@ -56,6 +57,11 @@ target_include_directories(lazytmux_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(lazytmux_core
+    PRIVATE
+        nlohmann_json::nlohmann_json
 )
 
 target_compile_features(lazytmux_core PUBLIC cxx_std_23)
@@ -79,6 +85,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_error.cpp
         tests/test_filter.cpp
         tests/test_frecency.cpp
+        tests/test_frecency_store.cpp
         tests/test_ids.cpp
         tests/test_nesting.cpp
         tests/test_parse.cpp

@@ -7,8 +7,11 @@
 #include <limits>
 #include <map>
 #include <numbers>
+#include <utility>
 
 namespace lazytmux::frecency {
+
+Index::Index(std::map<tmux::SessionName, Entry> entries) : entries_(std::move(entries)) {}
 
 void Index::visit(const tmux::SessionName& name, std::int64_t now) {
     auto& e = entries_[name];

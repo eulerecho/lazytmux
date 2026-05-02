@@ -5,6 +5,7 @@
 #include <compare>
 #include <cstdint>
 #include <map>
+#include <utility>
 
 /// @file
 /// @brief In-memory frecency index keyed by tmux session name,
@@ -39,6 +40,14 @@ inline constexpr double kHalfLifeSecs = 7.0 * 86400.0;
 /// decay.
 class Index {
 public:
+    /// @brief Construct an empty index.
+    Index() = default;
+
+    /// @brief Construct an index from validated entries.
+    /// @param entries Session-name keys and their persisted
+    ///        frecency rows.
+    explicit Index(std::map<tmux::SessionName, Entry> entries);
+
     /// @brief Record a visit to @p name at time @p now.
     ///
     /// Increments `visits` (saturating at u32::max) and sets
