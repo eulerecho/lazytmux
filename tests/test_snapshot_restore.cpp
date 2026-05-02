@@ -93,6 +93,7 @@ TEST(SnapshotRestoreTest, NonzeroScriptExitReturnsError) {
                                          .script_candidates = {script},
                                      });
     ASSERT_FALSE(restored.has_value());
+    EXPECT_EQ(restored.error().kind(), ErrorKind::kExternalCommandFailure);
     EXPECT_NE(restored.error().message().find("code 7"), std::string_view::npos);
 }
 

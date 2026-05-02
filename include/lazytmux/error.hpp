@@ -13,6 +13,39 @@
 
 namespace lazytmux {
 
+/// @brief Coarse category for a failure.
+///
+/// Error kinds are intentionally broad. They exist so CLI and TUI
+/// code can choose exit codes, notification severity, retry policy,
+/// and user-facing copy without parsing @ref Error::message text.
+enum class ErrorKind {
+    /// @brief Caller supplied invalid input.
+    kInvalidInput,
+    /// @brief Requested file, process, tmux object, or executable was not found.
+    kNotFound,
+    /// @brief The OS or external tool denied access to the requested resource.
+    kPermissionDenied,
+    /// @brief Non-config input could not be parsed.
+    kParse,
+    /// @brief User configuration was malformed or unsupported.
+    kConfig,
+    /// @brief An external command exited unsuccessfully.
+    kExternalCommandFailure,
+    /// @brief An operation exceeded its deadline.
+    kTimeout,
+    /// @brief Filesystem, process, socket, or other OS I/O failed.
+    kIo,
+    /// @brief The current platform cannot support the requested operation.
+    kUnsupportedPlatform,
+    /// @brief A programmer error or unexpected internal invariant failure.
+    kInternal,
+};
+
+/// @brief Stable ASCII name for an @ref ErrorKind.
+/// @param kind Kind to name.
+/// @return String name suitable for logs and debug output.
+[[nodiscard]] std::string_view error_kind_name(ErrorKind kind) noexcept;
+
 /// @brief A failure description with a capture site and an
 /// append-only stack of context labels.
 ///
@@ -26,11 +59,20 @@ namespace lazytmux {
 /// stacks describe the same underlying failure differently.
 class Error {
 public:
-    /// @brief Construct an error with a message.
+    /// @brief Construct an internal error with a message.
     /// @param message Human-readable failure description.
     /// @param loc Capture site, defaulted to the caller's
     ///        location via `std::source_location::current()`.
     Error(std::string message, std::source_location loc = std::source_location::current());
+
+    /// @brief Construct an error with a message.
+    /// @param kind Coarse failure category.
+    /// @param message Human-readable failure description.
+    /// @param loc Capture site, defaulted to the caller's
+    ///        location via `std::source_location::current()`.
+    Error(ErrorKind kind,
+          std::string message,
+          std::source_location loc = std::source_location::current());
 
     /// @brief Append a context label and return *this for
     /// chaining.
@@ -39,6 +81,9 @@ public:
 
     /// @brief The message passed at construction.
     [[nodiscard]] std::string_view message() const noexcept;
+
+    /// @brief The coarse failure category.
+    [[nodiscard]] ErrorKind kind() const noexcept;
 
     /// @brief The source location captured at construction.
     [[nodiscard]] const std::source_location& where() const noexcept;
@@ -52,6 +97,7 @@ public:
     [[nodiscard]] std::string display() const;
 
 private:
+    ErrorKind kind_;
     std::string message_;
     std::source_location where_;
     std::vector<std::string> contexts_;

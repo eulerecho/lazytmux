@@ -56,5 +56,11 @@ TEST(ZoxideLoadTest, MissingExecutableReturnsEmpty) {
     EXPECT_TRUE(entries->empty());
 }
 
+TEST(ZoxideLoadTest, NonzeroExecutableReturnsExternalCommandError) {
+    auto entries = load_top(20, "/bin/sh");
+    ASSERT_FALSE(entries.has_value());
+    EXPECT_EQ(entries.error().kind(), ErrorKind::kExternalCommandFailure);
+}
+
 }  // namespace
 }  // namespace lazytmux::zoxide

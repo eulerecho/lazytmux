@@ -11,7 +11,27 @@ namespace {
 TEST(ErrorTest, ConstructsWithMessage) {
     Error e{"boom"};
     EXPECT_EQ(e.message(), "boom");
+    EXPECT_EQ(e.kind(), ErrorKind::kInternal);
     EXPECT_TRUE(e.contexts().empty());
+}
+
+TEST(ErrorTest, ConstructsWithExplicitKind) {
+    Error e{ErrorKind::kInvalidInput, "bad flag"};
+    EXPECT_EQ(e.kind(), ErrorKind::kInvalidInput);
+    EXPECT_EQ(e.message(), "bad flag");
+}
+
+TEST(ErrorKindTest, NamesAreStableAscii) {
+    EXPECT_EQ(error_kind_name(ErrorKind::kInvalidInput), "invalid-input");
+    EXPECT_EQ(error_kind_name(ErrorKind::kNotFound), "not-found");
+    EXPECT_EQ(error_kind_name(ErrorKind::kPermissionDenied), "permission-denied");
+    EXPECT_EQ(error_kind_name(ErrorKind::kParse), "parse");
+    EXPECT_EQ(error_kind_name(ErrorKind::kConfig), "config");
+    EXPECT_EQ(error_kind_name(ErrorKind::kExternalCommandFailure), "external-command-failure");
+    EXPECT_EQ(error_kind_name(ErrorKind::kTimeout), "timeout");
+    EXPECT_EQ(error_kind_name(ErrorKind::kIo), "io");
+    EXPECT_EQ(error_kind_name(ErrorKind::kUnsupportedPlatform), "unsupported-platform");
+    EXPECT_EQ(error_kind_name(ErrorKind::kInternal), "internal");
 }
 
 TEST(ErrorTest, CapturesSourceLocation) {
@@ -23,8 +43,9 @@ TEST(ErrorTest, CapturesSourceLocation) {
 }
 
 TEST(ErrorTest, WithContextAppendsInOrder) {
-    Error e{"boom"};
+    Error e{ErrorKind::kIo, "boom"};
     e.with_context("first").with_context("second").with_context("third");
+    EXPECT_EQ(e.kind(), ErrorKind::kIo);
     ASSERT_EQ(e.contexts().size(), 3u);
     EXPECT_EQ(e.contexts()[0], "first");
     EXPECT_EQ(e.contexts()[1], "second");
@@ -46,19 +67,24 @@ TEST(ErrorTest, IsCopyableAndMovable) {
     original.with_context("ctx");
     Error copy = original;
     EXPECT_EQ(copy.message(), "boom");
+    EXPECT_EQ(copy.kind(), ErrorKind::kInternal);
     ASSERT_EQ(copy.contexts().size(), 1u);
     EXPECT_EQ(copy.contexts()[0], "ctx");
 
     Error moved = std::move(copy);
     EXPECT_EQ(moved.message(), "boom");
+    EXPECT_EQ(moved.kind(), ErrorKind::kInternal);
     ASSERT_EQ(moved.contexts().size(), 1u);
 }
 
 TEST(ResultTest, PropagatesViaUnexpected) {
-    auto fallible = []() -> Result<int> { return std::unexpected(Error{"computation failed"}); };
+    auto fallible = []() -> Result<int> {
+        return std::unexpected(Error{ErrorKind::kExternalCommandFailure, "computation failed"});
+    };
     auto r = fallible();
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error().message(), "computation failed");
+    EXPECT_EQ(r.error().kind(), ErrorKind::kExternalCommandFailure);
 }
 
 }  // namespace

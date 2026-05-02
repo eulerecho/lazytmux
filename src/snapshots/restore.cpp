@@ -105,8 +105,10 @@ Result<void> restore_snapshot(const std::filesystem::path& snapshot_path,
         return std::unexpected(std::move(result).error());
     }
     if (result->exit_code != 0) {
-        return std::unexpected(Error(std::format(
-            "restore script exited with code {}: {}", result->exit_code, result->stderr_text)));
+        return std::unexpected(Error{
+            ErrorKind::kExternalCommandFailure,
+            std::format(
+                "restore script exited with code {}: {}", result->exit_code, result->stderr_text)});
     }
     return {};
 }
