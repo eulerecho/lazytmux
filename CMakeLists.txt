@@ -36,6 +36,7 @@ target_sources(lazytmux_core
     PRIVATE
         src/cmdmode/commands.cpp
         src/cmdmode/parse.cpp
+        src/cli.cpp
         src/colors.cpp
         src/config.cpp
         src/error.cpp
