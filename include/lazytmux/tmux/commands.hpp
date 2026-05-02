@@ -23,6 +23,9 @@ namespace lazytmux::tmux {
 /// @brief tmux-continuum option that stores the last save as Unix seconds.
 inline constexpr std::string_view kContinuumLastSaveOption = "@continuum-save-last-timestamp";
 
+/// @brief Format string used by create helpers that return stable ids.
+inline constexpr std::string_view kCreatedPaneFormat = "#{window_id}|||#{pane_id}";
+
 /// @brief Injectable command runner used by hermetic command-helper tests.
 ///
 /// Production callers normally use the overloads that accept only
@@ -38,6 +41,15 @@ struct CommandRunner {
 
 /// @brief Target accepted by `tmux switch-client -t`.
 using SwitchTarget = std::variant<SessionName, WindowId, PaneId>;
+
+/// @brief Stable ids returned by tmux when a command creates a window and pane.
+struct CreatedPane {
+    WindowId window_id;
+    PaneId pane_id;
+
+    auto operator<=>(const CreatedPane&) const = default;
+    bool operator==(const CreatedPane&) const = default;
+};
 
 /// @brief Production runner backed by @ref run and @ref run_status.
 [[nodiscard]] CommandRunner default_command_runner();
@@ -149,6 +161,21 @@ using SwitchTarget = std::variant<SessionName, WindowId, PaneId>;
                                        const CommandRunner& runner,
                                        const RunConfig& config = {});
 
+/// @brief Create a tmux session and return its initial window/pane ids.
+[[nodiscard]] Result<CreatedPane> new_session_with_ids(const SessionName& name,
+                                                       std::string window_name,
+                                                       const std::filesystem::path& path,
+                                                       bool detached,
+                                                       const RunConfig& config = {});
+
+/// @brief Create a tmux session with id output through an injected runner.
+[[nodiscard]] Result<CreatedPane> new_session_with_ids(const SessionName& name,
+                                                       std::string window_name,
+                                                       const std::filesystem::path& path,
+                                                       bool detached,
+                                                       const CommandRunner& runner,
+                                                       const RunConfig& config = {});
+
 /// @brief Rename a tmux session.
 [[nodiscard]] Result<void> rename_session(const SessionName& old_name,
                                           const SessionName& new_name,
@@ -180,6 +207,19 @@ using SwitchTarget = std::variant<SessionName, WindowId, PaneId>;
                                       const std::filesystem::path& path,
                                       const CommandRunner& runner,
                                       const RunConfig& config = {});
+
+/// @brief Create a new window and return its window/pane ids.
+[[nodiscard]] Result<CreatedPane> new_window_with_ids(const SessionName& session,
+                                                      std::string name,
+                                                      const std::filesystem::path& path,
+                                                      const RunConfig& config = {});
+
+/// @brief Create a new window with id output through an injected runner.
+[[nodiscard]] Result<CreatedPane> new_window_with_ids(const SessionName& session,
+                                                      std::string name,
+                                                      const std::filesystem::path& path,
+                                                      const CommandRunner& runner,
+                                                      const RunConfig& config = {});
 
 /// @brief Rename a tmux window.
 [[nodiscard]] Result<void> rename_window(const WindowId& window,
@@ -265,6 +305,19 @@ enum class SendEnter {
                                       SplitDirection direction,
                                       const CommandRunner& runner,
                                       const RunConfig& config = {});
+
+/// @brief Split one pane and return the created pane id.
+[[nodiscard]] Result<PaneId> split_pane_with_id(const PaneId& pane,
+                                                const std::filesystem::path& path,
+                                                SplitDirection direction,
+                                                const RunConfig& config = {});
+
+/// @brief Split one pane with id output through an injected runner.
+[[nodiscard]] Result<PaneId> split_pane_with_id(const PaneId& pane,
+                                                const std::filesystem::path& path,
+                                                SplitDirection direction,
+                                                const CommandRunner& runner,
+                                                const RunConfig& config = {});
 
 /// @brief Kill one tmux pane.
 [[nodiscard]] Result<void> kill_pane(const PaneId& pane, const RunConfig& config = {});

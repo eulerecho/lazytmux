@@ -23,6 +23,21 @@ std::string to_string(std::string_view value) {
     return std::string{value};
 }
 
+std::vector<std::string_view> split_on_delim(std::string_view value, std::string_view delim) {
+    std::vector<std::string_view> fields;
+    std::size_t start = 0;
+    while (start <= value.size()) {
+        const auto pos = value.find(delim, start);
+        if (pos == std::string_view::npos) {
+            fields.push_back(value.substr(start));
+            break;
+        }
+        fields.push_back(value.substr(start, pos - start));
+        start = pos + delim.size();
+    }
+    return fields;
+}
+
 Result<std::string> call_run(const CommandRunner& runner,
                              std::span<const std::string> args,
                              const RunConfig& config,
@@ -94,6 +109,30 @@ std::string_view trim_ascii_whitespace(std::string_view value) {
         value.remove_suffix(1);
     }
     return value;
+}
+
+Result<CreatedPane> parse_created_pane(std::string_view output) {
+    output = trim_ascii_whitespace(output);
+    const auto fields = split_on_delim(output, kFieldDelim);
+    if (fields.size() != 2) {
+        return std::unexpected(Error{
+            ErrorKind::kParse,
+            std::format(
+                "created pane output: expected 2 fields, got {}: \"{}\"", fields.size(), output),
+        });
+    }
+    return CreatedPane{
+        .window_id = WindowId::from_validated(std::string{fields[0]}),
+        .pane_id = PaneId::from_validated(std::string{fields[1]}),
+    };
+}
+
+Result<PaneId> parse_created_pane_id(std::string_view output) {
+    output = trim_ascii_whitespace(output);
+    if (output.empty()) {
+        return std::unexpected(Error{ErrorKind::kParse, "created pane id output was empty"});
+    }
+    return PaneId::from_validated(std::string{output});
 }
 
 std::string target_to_string(const SwitchTarget& target) {
@@ -358,6 +397,42 @@ Result<void> new_session(const SessionName& name,
     return call_mutation(runner, args, config, "tmux new-session");
 }
 
+Result<CreatedPane> new_session_with_ids(const SessionName& name,
+                                         std::string window_name,
+                                         const std::filesystem::path& path,
+                                         bool detached,
+                                         const RunConfig& config) {
+    return new_session_with_ids(
+        name, std::move(window_name), path, detached, default_command_runner(), config);
+}
+
+Result<CreatedPane> new_session_with_ids(const SessionName& name,
+                                         std::string window_name,
+                                         const std::filesystem::path& path,
+                                         bool detached,
+                                         const CommandRunner& runner,
+                                         const RunConfig& config) {
+    std::vector<std::string> args{"new-session"};
+    if (detached) {
+        args.emplace_back("-d");
+    }
+    args.emplace_back("-s");
+    args.emplace_back(to_string(name.as_str()));
+    args.emplace_back("-n");
+    args.emplace_back(std::move(window_name));
+    args.emplace_back("-c");
+    args.emplace_back(path.string());
+    args.emplace_back("-P");
+    args.emplace_back("-F");
+    args.emplace_back(to_string(kCreatedPaneFormat));
+
+    auto out = call_run(runner, args, config, "tmux new-session");
+    if (!out) {
+        return std::unexpected(std::move(out).error());
+    }
+    return add_parse_context(parse_created_pane(*out), "parse new-session id output");
+}
+
 Result<void> rename_session(const SessionName& old_name,
                             const SessionName& new_name,
                             const RunConfig& config) {
@@ -404,6 +479,35 @@ Result<void> new_window(const SessionName& session,
                                         "-c",
                                         path.string()};
     return call_mutation(runner, args, config, "tmux new-window");
+}
+
+Result<CreatedPane> new_window_with_ids(const SessionName& session,
+                                        std::string name,
+                                        const std::filesystem::path& path,
+                                        const RunConfig& config) {
+    return new_window_with_ids(session, std::move(name), path, default_command_runner(), config);
+}
+
+Result<CreatedPane> new_window_with_ids(const SessionName& session,
+                                        std::string name,
+                                        const std::filesystem::path& path,
+                                        const CommandRunner& runner,
+                                        const RunConfig& config) {
+    const std::vector<std::string> args{"new-window",
+                                        "-t",
+                                        to_string(session.as_str()),
+                                        "-n",
+                                        std::move(name),
+                                        "-c",
+                                        path.string(),
+                                        "-P",
+                                        "-F",
+                                        to_string(kCreatedPaneFormat)};
+    auto out = call_run(runner, args, config, "tmux new-window");
+    if (!out) {
+        return std::unexpected(std::move(out).error());
+    }
+    return add_parse_context(parse_created_pane(*out), "parse new-window id output");
 }
 
 Result<void> rename_window(const WindowId& window, std::string name, const RunConfig& config) {
@@ -476,6 +580,34 @@ Result<void> split_pane(const PaneId& pane,
     const std::vector<std::string> args{
         "split-window", split_flag(direction), "-t", to_string(pane.as_str()), "-c", path.string()};
     return call_mutation(runner, args, config, "tmux split-window");
+}
+
+Result<PaneId> split_pane_with_id(const PaneId& pane,
+                                  const std::filesystem::path& path,
+                                  SplitDirection direction,
+                                  const RunConfig& config) {
+    return split_pane_with_id(pane, path, direction, default_command_runner(), config);
+}
+
+Result<PaneId> split_pane_with_id(const PaneId& pane,
+                                  const std::filesystem::path& path,
+                                  SplitDirection direction,
+                                  const CommandRunner& runner,
+                                  const RunConfig& config) {
+    const std::vector<std::string> args{"split-window",
+                                        split_flag(direction),
+                                        "-t",
+                                        to_string(pane.as_str()),
+                                        "-c",
+                                        path.string(),
+                                        "-P",
+                                        "-F",
+                                        "#{pane_id}"};
+    auto out = call_run(runner, args, config, "tmux split-window");
+    if (!out) {
+        return std::unexpected(std::move(out).error());
+    }
+    return add_parse_context(parse_created_pane_id(*out), "parse split-window id output");
 }
 
 Result<void> kill_pane(const PaneId& pane, const RunConfig& config) {

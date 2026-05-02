@@ -30,12 +30,12 @@ What lazytmux will do once v0.1 is ready:
 I/O wrappers, config loading, frecency persistence, zoxide parsing,
 snapshot listing/restore scaffolding, bounded tmux command
 execution, explicit socket selection, and typed tmux command helpers,
-but no user-facing CLI or TUI workflows are wired yet.
+plus template materialization, but no user-facing CLI or TUI
+workflows are wired yet.
 
 ## What comes next
 
 The next milestone is the rest of the domain command layer:
-session/window/pane mutation helpers, template materialization,
 frecency ranking, snapshot operations, and opt-in live tmux smoke
 tests.
 

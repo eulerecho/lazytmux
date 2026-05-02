@@ -357,6 +357,46 @@ TEST(TmuxCommandTest, NewSessionBuildsAttachedArgv) {
     expect_one_status_call(fake, {"new-session", "-s", "scratch", "-c", "/tmp"});
 }
 
+TEST(TmuxCommandTest, NewSessionWithIdsBuildsArgvAndParsesOutput) {
+    FakeRunner fake;
+    fake.next_output = "@5|||%12\n";
+    const auto name = SessionName::from_validated("scratch");
+
+    auto created = new_session_with_ids(name,
+                                        "main window",
+                                        std::filesystem::path{"/tmp/project one"},
+                                        true,
+                                        fake.command_runner());
+
+    ASSERT_TRUE(created.has_value()) << created.error().display();
+    EXPECT_EQ(created->window_id.as_str(), "@5");
+    EXPECT_EQ(created->pane_id.as_str(), "%12");
+    expect_one_output_call(fake,
+                           {"new-session",
+                            "-d",
+                            "-s",
+                            "scratch",
+                            "-n",
+                            "main window",
+                            "-c",
+                            "/tmp/project one",
+                            "-P",
+                            "-F",
+                            std::string{kCreatedPaneFormat}});
+}
+
+TEST(TmuxCommandTest, NewSessionWithIdsRejectsMalformedOutput) {
+    FakeRunner fake;
+    fake.next_output = "@5\n";
+    const auto name = SessionName::from_validated("scratch");
+
+    auto created = new_session_with_ids(
+        name, "main", std::filesystem::path{"/tmp"}, true, fake.command_runner());
+
+    ASSERT_FALSE(created.has_value());
+    EXPECT_EQ(created.error().kind(), ErrorKind::kParse);
+}
+
 TEST(TmuxCommandTest, RenameSessionBuildsArgv) {
     FakeRunner fake;
     const auto old_name = SessionName::from_validated("old");
@@ -400,6 +440,30 @@ TEST(TmuxCommandTest, NewWindowBuildsArgvWithSpaces) {
     ASSERT_TRUE(result.has_value()) << result.error().display();
     expect_one_status_call(
         fake, {"new-window", "-t", "dotfiles", "-n", "work tree", "-c", "/home/p/project one"});
+}
+
+TEST(TmuxCommandTest, NewWindowWithIdsBuildsArgvAndParsesOutput) {
+    FakeRunner fake;
+    fake.next_output = "@8|||%20\n";
+    const auto session = SessionName::from_validated("dotfiles");
+
+    auto created = new_window_with_ids(
+        session, "work tree", std::filesystem::path{"/home/p/project one"}, fake.command_runner());
+
+    ASSERT_TRUE(created.has_value()) << created.error().display();
+    EXPECT_EQ(created->window_id.as_str(), "@8");
+    EXPECT_EQ(created->pane_id.as_str(), "%20");
+    expect_one_output_call(fake,
+                           {"new-window",
+                            "-t",
+                            "dotfiles",
+                            "-n",
+                            "work tree",
+                            "-c",
+                            "/home/p/project one",
+                            "-P",
+                            "-F",
+                            std::string{kCreatedPaneFormat}});
 }
 
 TEST(TmuxCommandTest, RenameWindowBuildsArgvWithSpaces) {
@@ -466,6 +530,20 @@ TEST(TmuxCommandTest, SplitPaneBuildsVerticalArgv) {
 
     ASSERT_TRUE(result.has_value()) << result.error().display();
     expect_one_status_call(fake, {"split-window", "-v", "-t", "%12", "-c", "/tmp"});
+}
+
+TEST(TmuxCommandTest, SplitPaneWithIdBuildsArgvAndParsesOutput) {
+    FakeRunner fake;
+    fake.next_output = "%20\n";
+    const auto pane = PaneId::from_validated("%12");
+
+    auto created = split_pane_with_id(
+        pane, std::filesystem::path{"/tmp"}, SplitDirection::kVertical, fake.command_runner());
+
+    ASSERT_TRUE(created.has_value()) << created.error().display();
+    EXPECT_EQ(created->as_str(), "%20");
+    expect_one_output_call(
+        fake, {"split-window", "-v", "-t", "%12", "-c", "/tmp", "-P", "-F", "#{pane_id}"});
 }
 
 TEST(TmuxCommandTest, KillPaneBuildsArgv) {
