@@ -26,11 +26,18 @@ What lazytmux will do once v0.1 is ready:
 
 ## What works today
 
-`lazytmux --version`. The build, test, format, and CI pipeline is wired. That's the whole list.
+`lazytmux --version`. The core library now has parsers, pure logic,
+I/O wrappers, config loading, frecency persistence, zoxide parsing,
+snapshot listing/restore scaffolding, bounded tmux command
+execution, explicit socket selection, and typed tmux command helpers,
+but no user-facing CLI or TUI workflows are wired yet.
 
 ## What comes next
 
-The domain library lands first: format-string parsers, ID newtypes, an error model. Pure-logic code, no filesystem, no process spawning. After that come the I/O wrappers (process runner, `/proc` reader, socket discovery, TOML config loader) and the tmux command builders that sit on top.
+The next milestone is the rest of the domain command layer:
+session/window/pane mutation helpers, template materialization,
+frecency ranking, snapshot operations, and opt-in live tmux smoke
+tests.
 
 CLI subcommands ship before the TUI does, so the binary is useful from shell aliases while the FTXUI integration is still going in. Once the CLI is in, the TUI framework, panels, and action handlers come last. v0.1 ships when the full keybind set in [Goals](#goals) works against a live tmux server.
 
@@ -59,7 +66,7 @@ ctest --preset conan-enable_tsan_false-debug --output-on-failure
 ```bash
 ./scripts/format.sh --check    # clang-format dry-run, fails on any diff
 ./scripts/format.sh            # clang-format -i in place
-./scripts/test.sh -L live      # live-tmux suite (opt-in)
+./scripts/test.sh Debug -L live # live-tmux suite (opt-in, once added)
 ```
 
 Sanitizers go through Conan options:
@@ -88,10 +95,11 @@ scripts/             Build, test, and format wrappers.
 
 ## Requirements
 
+- Linux for v0.1
 - CMake 3.24+
-- GCC 13+ or Clang 17+ (C++23)
+- GCC 14+ or Clang 18+ (C++23)
 - [uv](https://docs.astral.sh/uv/) for the Python tooling (Conan, clang-format, ruff)
-- tmux 3.0+ at runtime (not needed to build)
+- tmux 3.2+ at runtime (not needed to build)
 
 ## License
 
