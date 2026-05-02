@@ -34,10 +34,17 @@ add_library(lazytmux::core ALIAS lazytmux_core)
 
 target_sources(lazytmux_core
     PRIVATE
+        src/cmdmode/commands.cpp
+        src/cmdmode/parse.cpp
+        src/colors.cpp
         src/error.cpp
+        src/filter.cpp
+        src/frecency.cpp
+        src/nesting.cpp
         src/snapshots/timestamp.cpp
         src/tmux/ids.cpp
         src/tmux/parse.cpp
+        src/tmux/socket.cpp
         src/version.cpp
 )
 
@@ -63,10 +70,16 @@ if(LAZYTMUX_BUILD_TESTS)
     include(GoogleTest)
 
     add_executable(test_scaffold
+        tests/test_cmdmode.cpp
+        tests/test_colors.cpp
         tests/test_error.cpp
+        tests/test_filter.cpp
+        tests/test_frecency.cpp
         tests/test_ids.cpp
+        tests/test_nesting.cpp
         tests/test_parse.cpp
         tests/test_smoke.cpp
+        tests/test_socket.cpp
         tests/test_timestamp.cpp
         tests/test_types.cpp
     )
