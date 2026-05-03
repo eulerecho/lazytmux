@@ -30,6 +30,8 @@ The binary supports:
 
 ```bash
 lazytmux --version
+lazytmux attach <session>
+lazytmux save
 lazytmux list-templates
 lazytmux materialize <template> <dir>
 lazytmux -L <name> materialize <template> <dir>
@@ -40,17 +42,16 @@ The core library now has parsers, pure logic, I/O wrappers, config
 loading, frecency persistence, zoxide parsing, snapshot
 listing/restore scaffolding, bounded tmux command execution,
 explicit socket selection, typed tmux command helpers, and template
-materialization. `attach`, `save`, and the interactive TUI are still
-pending.
+materialization. The binary now wires the scripting CLI commands;
+the interactive TUI is still pending.
 
 ## What comes next
 
-The next CLI milestones are `save`, `attach`, and opt-in live CLI
-smoke tests.
+The next CLI milestone is opt-in live CLI smoke tests.
 
 CLI subcommands ship before the TUI does, so the binary is useful from shell aliases while the FTXUI integration is still going in. Once the CLI is in, the TUI framework, panels, and action handlers come last. v0.1 ships when the full keybind set in [Goals](#goals) works against a live tmux server.
 
-A `docs/v0.1.md` with acceptance criteria lands once the CLI subcommands are in.
+A `docs/v0.1.md` with acceptance criteria lands after the live CLI smoke slice.
 
 ## Build
 

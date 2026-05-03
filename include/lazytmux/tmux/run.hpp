@@ -5,6 +5,7 @@
 
 #include <span>
 #include <string>
+#include <vector>
 
 /// @file
 /// @brief Thin tmux command runner built on the process runner.
@@ -55,6 +56,14 @@ struct RunConfig {
     /// @brief Process execution limits.
     io::CommandOptions command_options;
 };
+
+/// @brief Build the full argv used to invoke tmux.
+/// @param args Arguments to pass after the executable and
+///        optional socket selector.
+/// @param config Executable, socket selector, and process limits.
+/// @return Full argv including executable and socket selector.
+[[nodiscard]] std::vector<std::string> argv_for(std::span<const std::string> args,
+                                                const RunConfig& config = {});
 
 /// @brief Run tmux and return stdout when it exits with code 0.
 /// @param args Arguments to pass after the executable and

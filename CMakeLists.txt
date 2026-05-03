@@ -43,6 +43,7 @@ target_sources(lazytmux_core
         src/colors.cpp
         src/config.cpp
         src/error.cpp
+        src/exec.cpp
         src/filter.cpp
         src/frecency.cpp
         src/frecency_rank.cpp
@@ -101,6 +102,7 @@ if(LAZYTMUX_BUILD_TESTS)
         tests/test_colors.cpp
         tests/test_config.cpp
         tests/test_error.cpp
+        tests/test_exec.cpp
         tests/test_filter.cpp
         tests/test_frecency.cpp
         tests/test_frecency_rank.cpp

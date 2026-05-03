@@ -68,6 +68,10 @@ struct Harness {
     int config_loads{0};
     config::LoadResult loaded;
     FakeTmuxRunner tmux_runner;
+    Result<std::filesystem::path> save_script{
+        std::filesystem::path{"/home/u/.tmux/plugins/tmux-resurrect/scripts/save.sh"}};
+    std::vector<std::vector<std::string>> exec_calls;
+    Result<void> exec_result{};
     std::string out;
     std::string err;
 
@@ -79,6 +83,11 @@ struct Harness {
                     return loaded;
                 },
             .tmux_runner = tmux_runner.command_runner(),
+            .locate_save_script = [this] { return save_script; },
+            .replace_process = [this](std::span<const std::string> argv) -> Result<void> {
+                exec_calls.emplace_back(argv.begin(), argv.end());
+                return exec_result;
+            },
         };
     }
 
@@ -142,15 +151,117 @@ TEST(CliCommandTest, UsageErrorsReturnTwoAndPrintUsageToStderr) {
     EXPECT_EQ(harness.config_loads, 0);
 }
 
-TEST(CliCommandTest, UnsupportedCommandsReturnFailure) {
+TEST(CliCommandTest, SaveRunsResurrectScriptThroughTmuxWithSocketSelection) {
     Harness harness;
+    harness.tmux_runner.statuses.push_back(true);
+
+    const int exit_code = run(harness, {"-S", "/tmp/tmux-test", "save"});
+
+    EXPECT_EQ(exit_code, kExitSuccess) << harness.err;
+    EXPECT_TRUE(harness.out.empty());
+    EXPECT_TRUE(harness.err.empty());
+    EXPECT_EQ(harness.config_loads, 0);
+    ASSERT_EQ(harness.tmux_runner.calls.size(), 1U);
+    EXPECT_EQ(harness.tmux_runner.calls[0].kind, TmuxCallKind::kStatus);
+    EXPECT_EQ(harness.tmux_runner.calls[0].args,
+              (std::vector<std::string>{"run-shell",
+                                        "/home/u/.tmux/plugins/tmux-resurrect/scripts/save.sh"}));
+    EXPECT_EQ(harness.tmux_runner.calls[0].config.socket.kind, tmux::SocketSelectionKind::kPath);
+    EXPECT_EQ(harness.tmux_runner.calls[0].config.socket.value, "/tmp/tmux-test");
+    EXPECT_TRUE(harness.exec_calls.empty());
+}
+
+TEST(CliCommandTest, SaveMissingResurrectScriptFailsBeforeTmuxCalls) {
+    Harness harness;
+    harness.save_script =
+        std::unexpected(Error{ErrorKind::kNotFound, "tmux-resurrect save script not found"});
 
     const int exit_code = run(harness, {"save"});
 
     EXPECT_EQ(exit_code, kExitFailure);
     EXPECT_TRUE(harness.out.empty());
-    EXPECT_NE(harness.err.find("not implemented"), std::string::npos);
+    EXPECT_NE(harness.err.find("save script not found"), std::string::npos);
     EXPECT_EQ(harness.config_loads, 0);
+    EXPECT_TRUE(harness.tmux_runner.calls.empty());
+    EXPECT_TRUE(harness.exec_calls.empty());
+}
+
+TEST(CliCommandTest, SavePropagatesTmuxFailure) {
+    Harness harness;
+    harness.tmux_runner.statuses.push_back(false);
+
+    const int exit_code = run(harness, {"save"});
+
+    EXPECT_EQ(exit_code, kExitFailure);
+    EXPECT_TRUE(harness.out.empty());
+    EXPECT_NE(harness.err.find("tmux run-shell failed"), std::string::npos);
+    EXPECT_EQ(harness.config_loads, 0);
+    ASSERT_EQ(harness.tmux_runner.calls.size(), 1U);
+    EXPECT_TRUE(harness.exec_calls.empty());
+}
+
+TEST(CliCommandTest, AttachMissingSessionFailsWithoutExec) {
+    Harness harness;
+    harness.tmux_runner.statuses.push_back(false);
+
+    const int exit_code = run(harness, {"attach", "dev"});
+
+    EXPECT_EQ(exit_code, kExitFailure);
+    EXPECT_TRUE(harness.out.empty());
+    EXPECT_NE(harness.err.find("session not found: dev"), std::string::npos);
+    EXPECT_EQ(harness.config_loads, 0);
+    ASSERT_EQ(harness.tmux_runner.calls.size(), 1U);
+    EXPECT_EQ(harness.tmux_runner.calls[0].args,
+              (std::vector<std::string>{"has-session", "-t", "dev"}));
+    EXPECT_TRUE(harness.exec_calls.empty());
+}
+
+TEST(CliCommandTest, AttachExecsTmuxWithNamedSocketAfterSessionExists) {
+    Harness harness;
+    harness.tmux_runner.statuses.push_back(true);
+
+    const int exit_code = run(harness, {"-L", "work", "attach", "dev"});
+
+    EXPECT_EQ(exit_code, kExitSuccess) << harness.err;
+    EXPECT_TRUE(harness.out.empty());
+    EXPECT_TRUE(harness.err.empty());
+    EXPECT_EQ(harness.config_loads, 0);
+    ASSERT_EQ(harness.tmux_runner.calls.size(), 1U);
+    EXPECT_EQ(harness.tmux_runner.calls[0].args,
+              (std::vector<std::string>{"has-session", "-t", "dev"}));
+    EXPECT_EQ(harness.tmux_runner.calls[0].config.socket.kind, tmux::SocketSelectionKind::kNamed);
+    EXPECT_EQ(harness.tmux_runner.calls[0].config.socket.value, "work");
+    ASSERT_EQ(harness.exec_calls.size(), 1U);
+    EXPECT_EQ(harness.exec_calls[0],
+              (std::vector<std::string>{"tmux", "-L", "work", "attach-session", "-t", "dev"}));
+}
+
+TEST(CliCommandTest, AttachPropagatesSessionLookupError) {
+    Harness harness;
+    harness.tmux_runner.statuses.push_back(
+        std::unexpected(Error{ErrorKind::kTimeout, "tmux timed out"}));
+
+    const int exit_code = run(harness, {"attach", "dev"});
+
+    EXPECT_EQ(exit_code, kExitFailure);
+    EXPECT_TRUE(harness.out.empty());
+    EXPECT_NE(harness.err.find("tmux timed out"), std::string::npos);
+    EXPECT_EQ(harness.config_loads, 0);
+    EXPECT_TRUE(harness.exec_calls.empty());
+}
+
+TEST(CliCommandTest, AttachExecFailureReturnsFailure) {
+    Harness harness;
+    harness.tmux_runner.statuses.push_back(true);
+    harness.exec_result = std::unexpected(Error{ErrorKind::kIo, "execvp tmux failed: nope"});
+
+    const int exit_code = run(harness, {"attach", "dev"});
+
+    EXPECT_EQ(exit_code, kExitFailure);
+    EXPECT_TRUE(harness.out.empty());
+    EXPECT_NE(harness.err.find("execvp tmux failed"), std::string::npos);
+    EXPECT_EQ(harness.config_loads, 0);
+    ASSERT_EQ(harness.exec_calls.size(), 1U);
 }
 
 TEST(CliCommandTest, ListTemplatesPrintsValidNamesAndWarnings) {
