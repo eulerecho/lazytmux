@@ -339,6 +339,7 @@ LoadResult load_config_from_path(const std::filesystem::path& path) {
             .config = Config{},
             .warning =
                 std::format("config {}: {}; using defaults", path.string(), text.error().message()),
+            .used_defaults_due_to_error = true,
         };
     }
 
@@ -348,6 +349,7 @@ LoadResult load_config_from_path(const std::filesystem::path& path) {
             .config = Config{},
             .warning = std::format(
                 "config {}: {}; using defaults", path.string(), config.error().message()),
+            .used_defaults_due_to_error = true,
         };
     }
     return LoadResult{
