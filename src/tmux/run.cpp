@@ -8,9 +8,7 @@
 #include <vector>
 
 namespace lazytmux::tmux {
-namespace {
-
-std::vector<std::string> build_argv(std::span<const std::string> args, const RunConfig& config) {
+std::vector<std::string> argv_for(std::span<const std::string> args, const RunConfig& config) {
     std::vector<std::string> argv;
     argv.reserve(args.size() + 3U);
     argv.push_back(config.executable);
@@ -32,8 +30,6 @@ std::vector<std::string> build_argv(std::span<const std::string> args, const Run
     return argv;
 }
 
-}  // namespace
-
 SocketSelection SocketSelection::default_socket() {
     return {};
 }
@@ -47,7 +43,7 @@ SocketSelection SocketSelection::path(std::string path) {
 }
 
 Result<std::string> run(std::span<const std::string> args, const RunConfig& config) {
-    const auto argv = build_argv(args, config);
+    const auto argv = argv_for(args, config);
     auto result = io::run_command(argv, config.command_options);
     if (!result) {
         return std::unexpected(std::move(result).error());
@@ -62,7 +58,7 @@ Result<std::string> run(std::span<const std::string> args, const RunConfig& conf
 }
 
 Result<bool> run_status(std::span<const std::string> args, const RunConfig& config) {
-    const auto argv = build_argv(args, config);
+    const auto argv = argv_for(args, config);
     auto result = io::run_command_status(argv, config.command_options);
     if (!result) {
         return std::unexpected(std::move(result).error());

@@ -252,6 +252,18 @@ TEST(TmuxCommandTest, ContinuumLastSaveMalformedOutputReturnsParseError) {
     EXPECT_EQ(timestamp.error().kind(), ErrorKind::kParse);
 }
 
+TEST(TmuxCommandTest, RunShellBuildsArgv) {
+    FakeRunner fake;
+
+    auto result =
+        run_shell(std::filesystem::path{"/home/u/.tmux/plugins/tmux-resurrect/scripts/save.sh"},
+                  fake.command_runner());
+
+    ASSERT_TRUE(result.has_value()) << result.error().display();
+    expect_one_status_call(fake,
+                           {"run-shell", "/home/u/.tmux/plugins/tmux-resurrect/scripts/save.sh"});
+}
+
 TEST(TmuxCommandTest, RunnerErrorIsPropagatedWithContext) {
     FakeRunner fake;
     fake.next_output = std::unexpected(Error{ErrorKind::kTimeout, "tmux command timed out"});

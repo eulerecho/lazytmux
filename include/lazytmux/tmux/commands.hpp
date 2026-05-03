@@ -124,6 +124,15 @@ struct CreatedPane {
 [[nodiscard]] Result<std::optional<std::int64_t>> continuum_last_save(const CommandRunner& runner,
                                                                       const RunConfig& config = {});
 
+/// @brief Run a shell command through tmux.
+[[nodiscard]] Result<void> run_shell(const std::filesystem::path& command,
+                                     const RunConfig& config = {});
+
+/// @brief Run a shell command through tmux with an injected runner.
+[[nodiscard]] Result<void> run_shell(const std::filesystem::path& command,
+                                     const CommandRunner& runner,
+                                     const RunConfig& config = {});
+
 /// @brief Switch the current tmux client to a session, window, or pane target.
 [[nodiscard]] Result<void> switch_client(const SwitchTarget& target, const RunConfig& config = {});
 

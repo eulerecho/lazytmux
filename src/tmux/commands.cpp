@@ -341,6 +341,17 @@ Result<std::optional<std::int64_t>> continuum_last_save(const CommandRunner& run
     return std::optional<std::int64_t>{*parsed};
 }
 
+Result<void> run_shell(const std::filesystem::path& command, const RunConfig& config) {
+    return run_shell(command, default_command_runner(), config);
+}
+
+Result<void> run_shell(const std::filesystem::path& command,
+                       const CommandRunner& runner,
+                       const RunConfig& config) {
+    const std::vector<std::string> args{"run-shell", command.string()};
+    return call_mutation(runner, args, config, "tmux run-shell");
+}
+
 Result<void> switch_client(const SwitchTarget& target, const RunConfig& config) {
     return switch_client(target, default_command_runner(), config);
 }
