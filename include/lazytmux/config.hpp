@@ -113,6 +113,9 @@ struct LoadResult {
     /// @brief Warning shown when a present config was malformed
     ///        or had isolated template errors.
     std::optional<std::string> warning;
+    /// @brief True when an existing config could not be read or
+    ///        parsed and defaults were returned instead.
+    bool used_defaults_due_to_error{false};
 };
 
 /// @brief Resolve the config path from XDG-style environment

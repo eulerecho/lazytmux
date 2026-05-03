@@ -1,20 +1,20 @@
-#include <lazytmux/version.hpp>
+#include <lazytmux/cli_commands.hpp>
 
-#include <format>
 #include <iostream>
 #include <string_view>
-
-namespace {
-
-constexpr std::string_view kUsage = "usage: lazytmux [--version]\n";
-
-}  // namespace
+#include <vector>
 
 int main(int argc, char** argv) {
-    if (argc == 2 && std::string_view{argv[1]} == "--version") {
-        std::cout << std::format("lazytmux {}\n", lazytmux::kVersion);
-        return 0;
+    std::vector<std::string_view> args;
+    args.reserve(argc > 0 ? static_cast<std::size_t>(argc - 1) : 0U);
+    for (int i = 1; i < argc; ++i) {
+        args.emplace_back(argv[i]);
     }
-    std::cout << kUsage;
-    return argc == 1 ? 0 : 2;
+
+    auto dependencies = lazytmux::cli::default_command_dependencies();
+    const lazytmux::cli::OutputSinks sinks{
+        .out = [](std::string_view text) { std::cout << text; },
+        .err = [](std::string_view text) { std::cerr << text; },
+    };
+    return lazytmux::cli::run_args(args, dependencies, sinks);
 }

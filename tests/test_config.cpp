@@ -114,6 +114,7 @@ TEST(ConfigLoadTest, MissingFileLoadsDefaultsWithoutWarning) {
     auto loaded = load_config_from_path(tmp.path() / "missing.toml");
     EXPECT_FALSE(loaded.warning.has_value());
     EXPECT_TRUE(loaded.config.templates.map.empty());
+    EXPECT_FALSE(loaded.used_defaults_due_to_error);
 }
 
 TEST(ConfigLoadTest, MalformedFileLoadsDefaultsWithWarning) {
@@ -126,6 +127,7 @@ TEST(ConfigLoadTest, MalformedFileLoadsDefaultsWithWarning) {
     auto loaded = load_config_from_path(path);
     ASSERT_TRUE(loaded.warning.has_value());
     EXPECT_NE(loaded.warning->find("using defaults"), std::string::npos);
+    EXPECT_TRUE(loaded.used_defaults_due_to_error);
 }
 
 TEST(ConfigLoadTest, TemplateErrorsBecomeWarning) {
@@ -138,6 +140,7 @@ TEST(ConfigLoadTest, TemplateErrorsBecomeWarning) {
     auto loaded = load_config_from_path(path);
     ASSERT_TRUE(loaded.warning.has_value());
     EXPECT_NE(loaded.warning->find("at least one window"), std::string::npos);
+    EXPECT_FALSE(loaded.used_defaults_due_to_error);
 }
 
 }  // namespace
