@@ -86,7 +86,7 @@ instrumentation:
 
 The HTML report lands at `build/coverage/html/index.html`, and
 LCOV output lands at `build/coverage/lcov.info`. CI uploads that LCOV file to
-Codecov with `codecov/codecov-action@v5`; configure the repository secret
+Codecov with `codecov/codecov-action@v6.0.0`; configure the repository secret
 `CODECOV_TOKEN` unless tokenless uploads are enabled for the repo in Codecov.
 
 Sanitizers go through Conan options:
