@@ -7,7 +7,7 @@ prefix L → lazytmux popup → 1-5 panels → keystrokes for everything
 you used to remember chord-by-chord
 ```
 
-> **Status: early development.** Build system and CI are in. The binary handles `--version` and nothing else yet. None of the panels, command mode, templates, or CLI subcommands described below are wired up.
+> **Status: early development.** Build system and CI are in. The binary has the first scripting-oriented CLI commands, but the interactive TUI panels are not wired yet.
 
 ## Goals
 
@@ -26,18 +26,27 @@ What lazytmux will do once v0.1 is ready:
 
 ## What works today
 
-`lazytmux --version`. The core library now has parsers, pure logic,
-I/O wrappers, config loading, frecency persistence, zoxide parsing,
-snapshot listing/restore scaffolding, bounded tmux command
-execution, explicit socket selection, and typed tmux command helpers,
-plus template materialization, but no user-facing CLI or TUI
-workflows are wired yet.
+The binary supports:
+
+```bash
+lazytmux --version
+lazytmux list-templates
+lazytmux materialize <template> <dir>
+lazytmux -L <name> materialize <template> <dir>
+lazytmux -S <path> materialize <template> <dir>
+```
+
+The core library now has parsers, pure logic, I/O wrappers, config
+loading, frecency persistence, zoxide parsing, snapshot
+listing/restore scaffolding, bounded tmux command execution,
+explicit socket selection, typed tmux command helpers, and template
+materialization. `attach`, `save`, and the interactive TUI are still
+pending.
 
 ## What comes next
 
-The next milestone is the rest of the domain command layer:
-frecency ranking, snapshot operations, and opt-in live tmux smoke
-tests.
+The next CLI milestones are `save`, `attach`, and opt-in live CLI
+smoke tests.
 
 CLI subcommands ship before the TUI does, so the binary is useful from shell aliases while the FTXUI integration is still going in. Once the CLI is in, the TUI framework, panels, and action handlers come last. v0.1 ships when the full keybind set in [Goals](#goals) works against a live tmux server.
 
