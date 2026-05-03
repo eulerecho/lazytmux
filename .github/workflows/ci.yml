@@ -7,11 +7,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    env:
+      CC: clang-19
+      CXX: clang++-19
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+
+      - name: Install LLVM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-19 llvm-19 g++
 
       - name: Sync dev tooling
         run: uv sync --group dev
@@ -20,21 +28,66 @@ jobs:
         run: |
           uv run conan profile detect --force
           uv run conan install . \
-            -s build_type=Debug -s compiler.cppstd=23 \
+            -s build_type=Debug \
+            -s compiler=clang \
+            -s compiler.version=19 \
+            -s compiler.libcxx=libstdc++11 \
+            -s compiler.cppstd=23 \
             -o '&:enable_asan=True' -o '&:enable_ubsan=True' \
             --build=missing
 
       - name: Configure
-        run: cmake --preset conan-enable_tsan_false-debug
+        run: cmake --preset conan-enable_tsan_false-enable_coverage_false-debug
 
       - name: Format check
         run: ./scripts/format.sh --check
 
       - name: Build
-        run: cmake --build --preset conan-enable_tsan_false-debug
+        run: cmake --build --preset conan-enable_tsan_false-enable_coverage_false-debug
 
       - name: Test
-        run: ctest --preset conan-enable_tsan_false-debug --output-on-failure
+        run: ctest --preset conan-enable_tsan_false-enable_coverage_false-debug --output-on-failure
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install LLVM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-19 llvm-19 g++
+
+      - name: Sync dev tooling
+        run: uv sync --group dev
+
+      - name: Detect Conan profile
+        run: uv run conan profile detect --force
+
+      - name: Generate coverage
+        run: LAZYTMUX_SKIP_UV_SYNC=1 ./scripts/coverage.sh
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          disable_search: true
+          fail_ci_if_error: true
+          files: build/coverage/lcov.info
+          flags: clang19
+          name: clang19-lcov
+          root_dir: ${{ github.workspace }}
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage
 
   # TODO: add a tsan job once threading lands.
   # TODO: add macos-14 + clang lanes once cross-platform source
