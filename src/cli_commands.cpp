@@ -1,15 +1,20 @@
 #include <lazytmux/cli_commands.hpp>
 #include <lazytmux/config.hpp>
 #include <lazytmux/error.hpp>
+#include <lazytmux/exec.hpp>
 #include <lazytmux/templates.hpp>
 #include <lazytmux/tmux/commands.hpp>
 #include <lazytmux/version.hpp>
 
+#include <cstdlib>
 #include <expected>
+#include <filesystem>
 #include <format>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
+#include <vector>
 
 namespace lazytmux::cli {
 namespace {
@@ -62,6 +67,47 @@ Result<config::LoadResult> load_user_config(const CommandDependencies& dependenc
             Error{ErrorKind::kInternal, "CLI config loader callback is not configured"});
     }
     return dependencies.load_config();
+}
+
+std::vector<std::filesystem::path> default_save_script_candidates() {
+    const char* home = std::getenv("HOME");
+    if (home == nullptr || std::string_view{home}.empty()) {
+        return {};
+    }
+
+    const auto base = std::filesystem::path{home};
+    return {
+        base / ".tmux" / "plugins" / "tmux-resurrect" / "scripts" / "save.sh",
+        base / ".local" / "share" / "tmux" / "plugins" / "tmux-resurrect" / "scripts" / "save.sh",
+    };
+}
+
+Result<std::filesystem::path> locate_default_save_script() {
+    std::error_code ec;
+    for (const auto& path : default_save_script_candidates()) {
+        if (std::filesystem::is_regular_file(path, ec)) {
+            return path;
+        }
+        ec.clear();
+    }
+    return std::unexpected(Error{ErrorKind::kNotFound, "tmux-resurrect save script not found"});
+}
+
+Result<std::filesystem::path> locate_save_script(const CommandDependencies& dependencies) {
+    if (!dependencies.locate_save_script) {
+        return std::unexpected(
+            Error{ErrorKind::kInternal, "CLI save script locator callback is not configured"});
+    }
+    return dependencies.locate_save_script();
+}
+
+Result<void> replace_process(const CommandDependencies& dependencies,
+                             std::span<const std::string> argv) {
+    if (!dependencies.replace_process) {
+        return std::unexpected(
+            Error{ErrorKind::kInternal, "CLI exec replacement callback is not configured"});
+    }
+    return dependencies.replace_process(argv);
 }
 
 void write_config_warning(const OutputSinks& sinks, const config::LoadResult& loaded) {
@@ -149,6 +195,51 @@ int run_materialize_template(const CliRequest& request,
     return kExitSuccess;
 }
 
+int run_save(const CliRequest& request,
+             const CommandDependencies& dependencies,
+             const OutputSinks& sinks) {
+    auto script = locate_save_script(dependencies);
+    if (!script) {
+        write_error(sinks, script.error());
+        return kExitFailure;
+    }
+
+    auto saved = tmux::run_shell(*script, dependencies.tmux_runner, run_config_for(request));
+    if (!saved) {
+        write_error(sinks, saved.error());
+        return kExitFailure;
+    }
+
+    return kExitSuccess;
+}
+
+int run_attach(const CliRequest& request,
+               const AttachCommand& command,
+               const CommandDependencies& dependencies,
+               const OutputSinks& sinks) {
+    auto config = run_config_for(request);
+    auto exists = tmux::session_exists(command.session, dependencies.tmux_runner, config);
+    if (!exists) {
+        write_error(sinks, exists.error());
+        return kExitFailure;
+    }
+    if (!*exists) {
+        write(sinks.err, std::format("error: session not found: {}\n", command.session.as_str()));
+        return kExitFailure;
+    }
+
+    const std::vector<std::string> args{
+        "attach-session", "-t", std::string{command.session.as_str()}};
+    const auto argv = tmux::argv_for(args, config);
+    auto replaced = replace_process(dependencies, argv);
+    if (!replaced) {
+        write_error(sinks, replaced.error());
+        return kExitFailure;
+    }
+
+    return kExitSuccess;
+}
+
 int unsupported_command(const CliRequest& request, const OutputSinks& sinks) {
     const auto kind = command_kind(request.command);
     write(sinks.err, std::format("error: {} is not implemented yet\n", command_name(kind)));
@@ -161,6 +252,9 @@ CommandDependencies default_command_dependencies() {
     return CommandDependencies{
         .load_config = [] { return config::load_config(); },
         .tmux_runner = tmux::default_command_runner(),
+        .locate_save_script = [] { return locate_default_save_script(); },
+        .replace_process =
+            [](std::span<const std::string> argv) { return exec::replace_process(argv); },
     };
 }
 
@@ -176,8 +270,10 @@ int run_request(const CliRequest& request,
             write(sinks.out, std::format("lazytmux {}\n", kVersion));
             return kExitSuccess;
         case CommandKind::kAttach:
+            return run_attach(
+                request, std::get<AttachCommand>(request.command), dependencies, sinks);
         case CommandKind::kSave:
-            return unsupported_command(request, sinks);
+            return run_save(request, dependencies, sinks);
         case CommandKind::kListTemplates:
             return run_list_templates(dependencies, sinks);
         case CommandKind::kMaterialize:

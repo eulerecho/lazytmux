@@ -2,8 +2,10 @@
 
 #include <lazytmux/cli.hpp>
 #include <lazytmux/config.hpp>
+#include <lazytmux/exec.hpp>
 #include <lazytmux/tmux/commands.hpp>
 
+#include <filesystem>
 #include <functional>
 #include <span>
 #include <string_view>
@@ -24,6 +26,12 @@ struct CommandDependencies {
 
     /// @brief tmux command runner. Injected in tests.
     tmux::CommandRunner tmux_runner;
+
+    /// @brief Locate the tmux-resurrect save script. Injected in tests.
+    std::function<Result<std::filesystem::path>()> locate_save_script;
+
+    /// @brief Replace this process with another executable. Injected in tests.
+    exec::ReplaceProcess replace_process;
 };
 
 /// @brief Writable output channels used by CLI command execution.
