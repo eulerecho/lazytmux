@@ -37,6 +37,7 @@ target_sources(lazytmux_core
         src/cmdmode/commands.cpp
         src/cmdmode/parse.cpp
         src/cli.cpp
+        src/cli_commands.cpp
         src/colors.cpp
         src/config.cpp
         src/error.cpp
@@ -92,6 +93,7 @@ if(LAZYTMUX_BUILD_TESTS)
     add_executable(test_scaffold
         tests/test_cmdmode.cpp
         tests/test_cli.cpp
+        tests/test_cli_commands.cpp
         tests/test_colors.cpp
         tests/test_config.cpp
         tests/test_error.cpp
