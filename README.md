@@ -55,10 +55,16 @@ Or manually:
 
 ```bash
 uv sync --group dev
-uv run conan install . -s build_type=Debug -s compiler.cppstd=23 --build=missing
-cmake --preset conan-enable_tsan_false-debug
-cmake --build --preset conan-enable_tsan_false-debug
-ctest --preset conan-enable_tsan_false-debug --output-on-failure
+CC=clang-19 CXX=clang++-19 uv run conan install . \
+    -s build_type=Debug \
+    -s compiler=clang \
+    -s compiler.version=19 \
+    -s compiler.libcxx=libstdc++11 \
+    -s compiler.cppstd=23 \
+    --build=missing
+cmake --preset conan-enable_tsan_false-enable_coverage_false-debug
+cmake --build --preset conan-enable_tsan_false-enable_coverage_false-debug
+ctest --preset conan-enable_tsan_false-enable_coverage_false-debug --output-on-failure
 ```
 
 ## Develop
@@ -69,12 +75,27 @@ ctest --preset conan-enable_tsan_false-debug --output-on-failure
 ./scripts/test.sh Debug -L live # live-tmux suite (opt-in, once added)
 ```
 
+Coverage uses a separate Clang 19/libstdc++/llvm-cov build with source-based
+instrumentation:
+
+```bash
+# Ubuntu 24.04 package names:
+# sudo apt-get install clang-19 llvm-19 g++
+./scripts/coverage.sh
+```
+
+The HTML report lands at `build/coverage/html/index.html`, and
+LCOV output lands at `build/coverage/lcov.info`. CI uploads that LCOV file to
+Codecov with `codecov/codecov-action@v6.0.0`; configure the repository secret
+`CODECOV_TOKEN` unless tokenless uploads are enabled for the repo in Codecov.
+
 Sanitizers go through Conan options:
 
 ```bash
 uv run conan install . -s build_type=Debug -s compiler.cppstd=23 \
+    -s compiler=clang -s compiler.version=19 -s compiler.libcxx=libstdc++11 \
     -o '&:enable_asan=True' -o '&:enable_ubsan=True' --build=missing
-cmake --preset conan-enable_tsan_false-debug
+cmake --preset conan-enable_tsan_false-enable_coverage_false-debug
 
 LAZYTMUX_TSAN=1 ./scripts/configure.sh
 LAZYTMUX_TSAN=1 ./scripts/build.sh
@@ -97,7 +118,7 @@ scripts/             Build, test, and format wrappers.
 
 - Linux for v0.1
 - CMake 3.24+
-- GCC 14+ or Clang 18+ (C++23)
+- Clang 19 with GNU libstdc++ for C++23
 - [uv](https://docs.astral.sh/uv/) for the Python tooling (Conan, clang-format, ruff)
 - tmux 3.2+ at runtime (not needed to build)
 
