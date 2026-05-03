@@ -16,6 +16,7 @@ class LazytmuxRecipe(ConanFile):
         "enable_asan": [True, False],
         "enable_ubsan": [True, False],
         "enable_tsan": [True, False],
+        "enable_coverage": [True, False],
     }
 
     default_options = {
@@ -24,6 +25,7 @@ class LazytmuxRecipe(ConanFile):
         "enable_asan": False,
         "enable_ubsan": False,
         "enable_tsan": False,
+        "enable_coverage": False,
     }
 
     def requirements(self):
@@ -35,7 +37,7 @@ class LazytmuxRecipe(ConanFile):
             self.test_requires("gtest/1.17.0")
 
     def layout(self):
-        self.folders.build_folder_vars = ["options.enable_tsan"]
+        self.folders.build_folder_vars = ["options.enable_tsan", "options.enable_coverage"]
         cmake_layout(self)
 
     def generate(self):
@@ -45,6 +47,7 @@ class LazytmuxRecipe(ConanFile):
         tc.variables["LAZYTMUX_ENABLE_ASAN"] = bool(self.options.enable_asan)
         tc.variables["LAZYTMUX_ENABLE_UBSAN"] = bool(self.options.enable_ubsan)
         tc.variables["LAZYTMUX_ENABLE_TSAN"] = bool(self.options.enable_tsan)
+        tc.variables["LAZYTMUX_ENABLE_COVERAGE"] = bool(self.options.enable_coverage)
         tc.generate()
 
         deps = CMakeDeps(self)

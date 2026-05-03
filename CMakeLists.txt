@@ -11,6 +11,7 @@ option(LAZYTMUX_BUILD_EXAMPLES "Build examples" OFF)
 option(LAZYTMUX_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 option(LAZYTMUX_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
 option(LAZYTMUX_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+option(LAZYTMUX_ENABLE_COVERAGE "Enable compiler coverage instrumentation" OFF)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,6 +26,7 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(LazytmuxWarnings)
 include(LazytmuxSanitizers)
+include(LazytmuxCoverage)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
@@ -77,12 +79,14 @@ target_link_libraries(lazytmux_core
 target_compile_features(lazytmux_core PUBLIC cxx_std_23)
 lazytmux_apply_warnings(lazytmux_core)
 lazytmux_apply_sanitizers(lazytmux_core)
+lazytmux_apply_coverage(lazytmux_core)
 
 add_executable(lazytmux src/main.cpp)
 target_link_libraries(lazytmux PRIVATE lazytmux::core)
 target_compile_features(lazytmux PRIVATE cxx_std_23)
 lazytmux_apply_warnings(lazytmux)
 lazytmux_apply_sanitizers(lazytmux)
+lazytmux_apply_coverage(lazytmux)
 
 if(LAZYTMUX_BUILD_TESTS)
     find_package(GTest CONFIG REQUIRED)
@@ -126,6 +130,7 @@ if(LAZYTMUX_BUILD_TESTS)
     target_compile_features(test_scaffold PRIVATE cxx_std_23)
     lazytmux_apply_warnings(test_scaffold)
     lazytmux_apply_sanitizers(test_scaffold)
+    lazytmux_apply_coverage(test_scaffold)
 
     gtest_discover_tests(test_scaffold
         DISCOVERY_MODE PRE_TEST
@@ -143,6 +148,7 @@ if(LAZYTMUX_BUILD_TESTS)
     target_compile_features(test_live_tmux PRIVATE cxx_std_23)
     lazytmux_apply_warnings(test_live_tmux)
     lazytmux_apply_sanitizers(test_live_tmux)
+    lazytmux_apply_coverage(test_live_tmux)
 
     gtest_discover_tests(test_live_tmux
         DISCOVERY_MODE PRE_TEST
