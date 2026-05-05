@@ -10,17 +10,25 @@
 #include <cerrno>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
+#include <utility>
 #include <vector>
+
+#ifndef LAZYTMUX_BINARY_PATH
+#error "LAZYTMUX_BINARY_PATH must point at the built lazytmux binary"
+#endif
 
 namespace lazytmux {
 namespace {
@@ -34,6 +42,31 @@ bool tmux_available() {
     auto version = io::run_command(std::vector<std::string>{"tmux", "-V"});
     return version && version->exit_code == 0;
 }
+
+class ScopedEnv {
+public:
+    ScopedEnv(std::string name, std::string value) : name_(std::move(name)) {
+        if (const char* current = std::getenv(name_.c_str()); current != nullptr) {
+            previous_ = current;
+        }
+        EXPECT_EQ(::setenv(name_.c_str(), value.c_str(), 1), 0) << std::strerror(errno);
+    }
+
+    ScopedEnv(const ScopedEnv&) = delete;
+    ScopedEnv& operator=(const ScopedEnv&) = delete;
+
+    ~ScopedEnv() {
+        if (previous_) {
+            static_cast<void>(::setenv(name_.c_str(), previous_->c_str(), 1));
+        } else {
+            static_cast<void>(::unsetenv(name_.c_str()));
+        }
+    }
+
+private:
+    std::string name_;
+    std::optional<std::string> previous_;
+};
 
 class LiveTmuxServer {
 public:
@@ -167,6 +200,55 @@ bool capture_eventually_contains(const tmux::PaneId& pane,
     return false;
 }
 
+bool file_eventually_contains(const std::filesystem::path& path, std::string_view needle) {
+    for (int i = 0; i < kPollAttempts; ++i) {
+        std::ifstream in(path);
+        if (in) {
+            const std::string text{std::istreambuf_iterator<char>{in},
+                                   std::istreambuf_iterator<char>{}};
+            if (text.find(needle) != std::string::npos) {
+                return true;
+            }
+        }
+        std::this_thread::sleep_for(kPollDelay);
+    }
+    return false;
+}
+
+void write_file(const std::filesystem::path& path, std::string_view contents) {
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream out(path);
+    ASSERT_TRUE(out) << "failed to open " << path;
+    out << contents;
+    out.close();
+    ASSERT_TRUE(out) << "failed to write " << path;
+}
+
+std::vector<std::string> lazytmux_argv(const LiveTmuxServer& server,
+                                       std::vector<std::string> args) {
+    std::vector<std::string> argv{
+        std::string{LAZYTMUX_BINARY_PATH},
+        "-S",
+        server.config().socket.value,
+    };
+    argv.insert(argv.end(), args.begin(), args.end());
+    return argv;
+}
+
+Result<io::CommandResult> run_lazytmux(const LiveTmuxServer& server,
+                                       std::vector<std::string> args,
+                                       const io::CommandOptions& options = {}) {
+    return io::run_command(lazytmux_argv(server, std::move(args)), options);
+}
+
+TEST(LiveTmuxTest, CliBinaryPrintsVersion) {
+    auto version =
+        io::run_command(std::vector<std::string>{std::string{LAZYTMUX_BINARY_PATH}, "--version"});
+    ASSERT_TRUE(version.has_value()) << version.error().display();
+    EXPECT_EQ(version->exit_code, 0) << version->stderr_text;
+    EXPECT_NE(version->stdout_text.find("lazytmux "), std::string::npos);
+}
+
 TEST(LiveTmuxTest, StartsScratchServerAndListsSessions) {
     if (!tmux_available()) {
         GTEST_SKIP() << "tmux executable is not available";
@@ -293,6 +375,106 @@ TEST(LiveTmuxTest, MaterializesTwoWindowTemplate) {
     ASSERT_EQ(log_panes->size(), 1U);
     EXPECT_TRUE(
         capture_eventually_contains(log_panes->front().id, server.config(), "lazytmux-live-logs"));
+}
+
+TEST(LiveTmuxTest, CliBinaryListsAndMaterializesTemplate) {
+    if (!tmux_available()) {
+        GTEST_SKIP() << "tmux executable is not available";
+    }
+    LiveTmuxServer server{"cli_template"};
+    const auto xdg_home = server.root() / "xdg";
+    ScopedEnv xdg{"XDG_CONFIG_HOME", xdg_home.string()};
+    auto started = server.start();
+    ASSERT_TRUE(started.has_value()) << started.error().display();
+
+    ASSERT_NO_FATAL_FAILURE(
+        write_file(xdg_home / "lazytmux" / "config.toml",
+                   "[templates.work]\n"
+                   "windows = [\n"
+                   "  { name = \"editor\", command = \"printf lazytmux-cli-editor\" },\n"
+                   "  { name = \"logs\", command = \"printf lazytmux-cli-logs\" },\n"
+                   "]\n"));
+
+    auto listed = run_lazytmux(server, {"list-templates"});
+    ASSERT_TRUE(listed.has_value()) << listed.error().display();
+    EXPECT_EQ(listed->exit_code, 0) << listed->stderr_text;
+    EXPECT_NE(listed->stdout_text.find("work\n"), std::string::npos);
+
+    auto materialized = run_lazytmux(server, {"materialize", "work", server.root().string()});
+    ASSERT_TRUE(materialized.has_value()) << materialized.error().display();
+    EXPECT_EQ(materialized->exit_code, 0) << materialized->stderr_text;
+
+    const auto session = tmux::SessionName::make("work");
+    ASSERT_TRUE(session.has_value()) << session.error().display();
+    auto windows = tmux::list_windows(*session, server.config());
+    ASSERT_TRUE(windows.has_value()) << windows.error().display();
+    ASSERT_EQ(windows->size(), 2U);
+
+    auto editor = find_window(*windows, "editor");
+    auto logs = find_window(*windows, "logs");
+    ASSERT_TRUE(editor.has_value());
+    ASSERT_TRUE(logs.has_value());
+
+    auto editor_panes = tmux::list_panes(editor->id, server.config());
+    ASSERT_TRUE(editor_panes.has_value()) << editor_panes.error().display();
+    ASSERT_EQ(editor_panes->size(), 1U);
+    EXPECT_TRUE(capture_eventually_contains(
+        editor_panes->front().id, server.config(), "lazytmux-cli-editor"));
+
+    auto log_panes = tmux::list_panes(logs->id, server.config());
+    ASSERT_TRUE(log_panes.has_value()) << log_panes.error().display();
+    ASSERT_EQ(log_panes->size(), 1U);
+    EXPECT_TRUE(
+        capture_eventually_contains(log_panes->front().id, server.config(), "lazytmux-cli-logs"));
+}
+
+TEST(LiveTmuxTest, CliBinaryRunsResurrectSaveScript) {
+    if (!tmux_available()) {
+        GTEST_SKIP() << "tmux executable is not available";
+    }
+    LiveTmuxServer server{"cli_save"};
+    const auto home = server.root() / "home";
+    const auto marker = server.root() / "save-marker";
+    const auto script = home / ".tmux" / "plugins" / "tmux-resurrect" / "scripts" / "save.sh";
+    ScopedEnv scoped_home{"HOME", home.string()};
+    auto started = server.start();
+    ASSERT_TRUE(started.has_value()) << started.error().display();
+
+    ASSERT_NO_FATAL_FAILURE(write_file(script,
+                                       std::string{"#!/usr/bin/env bash\n"
+                                                   "printf lazytmux-cli-save > "} +
+                                           marker.string() + "\n"));
+    std::filesystem::permissions(script,
+                                 std::filesystem::perms::owner_read |
+                                     std::filesystem::perms::owner_write |
+                                     std::filesystem::perms::owner_exec,
+                                 std::filesystem::perm_options::replace);
+
+    auto saved = run_lazytmux(server, {"save"});
+    ASSERT_TRUE(saved.has_value()) << saved.error().display();
+    EXPECT_EQ(saved->exit_code, 0) << saved->stderr_text;
+    EXPECT_TRUE(file_eventually_contains(marker, "lazytmux-cli-save"));
+}
+
+TEST(LiveTmuxTest, CliBinaryAttachReplacesProcessWithTmux) {
+    if (!tmux_available()) {
+        GTEST_SKIP() << "tmux executable is not available";
+    }
+    LiveTmuxServer server{"cli_attach"};
+    auto started = server.start();
+    ASSERT_TRUE(started.has_value()) << started.error().display();
+    const auto session = server.session("attach");
+
+    auto created = tmux::new_session(session, server.root(), true, server.config());
+    ASSERT_TRUE(created.has_value()) << created.error().display();
+
+    auto attached = run_lazytmux(server,
+                                 {"attach", std::string{session.as_str()}},
+                                 io::CommandOptions{.timeout = std::chrono::milliseconds{1000}});
+    ASSERT_TRUE(attached.has_value()) << attached.error().display();
+    EXPECT_NE(attached->exit_code, 0);
+    EXPECT_EQ(attached->stderr_text.find("session not found"), std::string::npos);
+    EXPECT_EQ(attached->stderr_text.find("tmux has-session"), std::string::npos);
 }
 
 }  // namespace
