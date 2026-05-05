@@ -47,11 +47,16 @@ the interactive TUI is still pending.
 
 ## What comes next
 
-The next CLI milestone is opt-in live CLI smoke tests.
+The CLI now has hermetic command tests plus opt-in live smoke
+coverage against a scratch tmux server.
 
-CLI subcommands ship before the TUI does, so the binary is useful from shell aliases while the FTXUI integration is still going in. Once the CLI is in, the TUI framework, panels, and action handlers come last. v0.1 ships when the full keybind set in [Goals](#goals) works against a live tmux server.
+CLI subcommands ship before the TUI does, so the binary is useful
+from shell aliases while the FTXUI integration is still going in.
+Next is the TUI framework, panels, and action handlers. v0.1 ships
+when the full keybind set in [Goals](#goals) works against a live
+tmux server.
 
-A `docs/v0.1.md` with acceptance criteria lands after the live CLI smoke slice.
+A `docs/v0.1.md` with acceptance criteria is still pending.
 
 ## Build
 

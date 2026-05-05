@@ -150,6 +150,11 @@ if(LAZYTMUX_BUILD_TESTS)
             GTest::gtest_main
     )
     target_compile_features(test_live_tmux PRIVATE cxx_std_23)
+    target_compile_definitions(test_live_tmux
+        PRIVATE
+            LAZYTMUX_BINARY_PATH="$<TARGET_FILE:lazytmux>"
+    )
+    add_dependencies(test_live_tmux lazytmux)
     lazytmux_apply_warnings(test_live_tmux)
     lazytmux_apply_sanitizers(test_live_tmux)
     lazytmux_apply_coverage(test_live_tmux)
