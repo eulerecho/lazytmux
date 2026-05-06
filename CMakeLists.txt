@@ -30,6 +30,7 @@ include(LazytmuxCoverage)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
+find_package(ftxui CONFIG REQUIRED)
 
 add_library(lazytmux_core STATIC)
 add_library(lazytmux::core ALIAS lazytmux_core)
@@ -137,6 +138,25 @@ if(LAZYTMUX_BUILD_TESTS)
     lazytmux_apply_coverage(test_scaffold)
 
     gtest_discover_tests(test_scaffold
+        DISCOVERY_MODE PRE_TEST
+    )
+
+    add_executable(test_ftxui_smoke
+        tests/test_ftxui_smoke.cpp
+    )
+    target_link_libraries(test_ftxui_smoke
+        PRIVATE
+            ftxui::dom
+            ftxui::screen
+            GTest::gtest
+            GTest::gtest_main
+    )
+    target_compile_features(test_ftxui_smoke PRIVATE cxx_std_23)
+    lazytmux_apply_warnings(test_ftxui_smoke)
+    lazytmux_apply_sanitizers(test_ftxui_smoke)
+    lazytmux_apply_coverage(test_ftxui_smoke)
+
+    gtest_discover_tests(test_ftxui_smoke
         DISCOVERY_MODE PRE_TEST
     )
 
