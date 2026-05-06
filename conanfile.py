@@ -29,6 +29,7 @@ class LazytmuxRecipe(ConanFile):
     }
 
     def requirements(self):
+        self.requires("ftxui/6.1.9")
         self.requires("nlohmann_json/3.11.3")
         self.requires("tomlplusplus/3.4.0")
 

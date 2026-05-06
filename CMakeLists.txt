@@ -30,6 +30,7 @@ include(LazytmuxCoverage)
 
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
+find_package(ftxui CONFIG REQUIRED)
 
 add_library(lazytmux_core STATIC)
 add_library(lazytmux::core ALIAS lazytmux_core)
@@ -140,6 +141,47 @@ if(LAZYTMUX_BUILD_TESTS)
         DISCOVERY_MODE PRE_TEST
     )
 
+    add_executable(test_ftxui_smoke
+        tests/test_ftxui_smoke.cpp
+    )
+    target_link_libraries(test_ftxui_smoke
+        PRIVATE
+            ftxui::dom
+            ftxui::screen
+            GTest::gtest
+            GTest::gtest_main
+    )
+    target_compile_features(test_ftxui_smoke PRIVATE cxx_std_23)
+    lazytmux_apply_warnings(test_ftxui_smoke)
+    lazytmux_apply_sanitizers(test_ftxui_smoke)
+    lazytmux_apply_coverage(test_ftxui_smoke)
+
+    gtest_discover_tests(test_ftxui_smoke
+        DISCOVERY_MODE PRE_TEST
+    )
+
+    add_executable(test_ui_vertical_slice
+        tests/test_ui_vertical_slice.cpp
+    )
+    target_include_directories(test_ui_vertical_slice
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/examples"
+    )
+    target_link_libraries(test_ui_vertical_slice
+        PRIVATE
+            ftxui::component
+            GTest::gtest
+            GTest::gtest_main
+    )
+    target_compile_features(test_ui_vertical_slice PRIVATE cxx_std_23)
+    lazytmux_apply_warnings(test_ui_vertical_slice)
+    lazytmux_apply_sanitizers(test_ui_vertical_slice)
+    lazytmux_apply_coverage(test_ui_vertical_slice)
+
+    gtest_discover_tests(test_ui_vertical_slice
+        DISCOVERY_MODE PRE_TEST
+    )
+
     add_executable(test_live_tmux
         tests/test_live_tmux.cpp
     )
@@ -166,7 +208,20 @@ if(LAZYTMUX_BUILD_TESTS)
 endif()
 
 if(LAZYTMUX_BUILD_EXAMPLES)
+    add_executable(lazytmux_ui_vertical_slice
+        examples/ui_vertical_slice.cpp
+    )
+    target_link_libraries(lazytmux_ui_vertical_slice
+        PRIVATE
+            ftxui::component
+    )
+    target_compile_features(lazytmux_ui_vertical_slice PRIVATE cxx_std_23)
+    lazytmux_apply_warnings(lazytmux_ui_vertical_slice)
+    lazytmux_apply_sanitizers(lazytmux_ui_vertical_slice)
+    lazytmux_apply_coverage(lazytmux_ui_vertical_slice)
+
     add_custom_target(examples
-        COMMAND ${CMAKE_COMMAND} -E echo "Examples are not configured yet."
+        DEPENDS
+            lazytmux_ui_vertical_slice
     )
 endif()
